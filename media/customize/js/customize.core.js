@@ -96,8 +96,6 @@
     // owning plugin can persist the change. This is shared so future draggable things reuse it.
 
     function highlightDroppables(doc, type, on) {
-      doc.body.classList.toggle('customize-dragging-active', on);
-
       Array.prototype.forEach.call(doc.querySelectorAll('[data-customize-type="' + type + '"]'), function (el) {
         if (el !== dragEl) {
           el.classList.toggle('customize-droppable', on);
@@ -108,11 +106,15 @@
         }
       });
 
-      if (!on) {
-        Array.prototype.forEach.call(doc.querySelectorAll('[data-customize-dropzone]'), function (z) {
+      // Reveal only the drop zones that accept the dragged type (e.g. module zones for a module drag,
+      // not for a field drag).
+      Array.prototype.forEach.call(doc.querySelectorAll('[data-customize-dropzone="' + type + '"]'), function (z) {
+        z.classList.toggle('customize-dropzone-active', on);
+
+        if (!on) {
           z.classList.remove('customize-drop-target');
-        });
-      }
+        }
+      });
     }
 
     // A red "remove" bar shown at the top while dragging an area type whose definition provides an
@@ -400,9 +402,27 @@
       var areas = doc.querySelectorAll('[data-customize-type]');
       setStatus(JC.text('COM_MENUS_CUSTOMIZE_STATUS_ACTIVE', 'Customize mode active · %s editable area(s)').replace('%s', areas.length), true);
 
+      var win = doc.defaultView;
+      var hideTimer = null;
+
+      function cancelHide() {
+        if (hideTimer) {
+          win.clearTimeout(hideTimer);
+          hideTimer = null;
+        }
+      }
+
+      // Hide on a short delay so moving from an element to its toolbar (the drag handle) across a
+      // small gap doesn't dismiss it mid-grab.
+      function scheduleHide() {
+        cancelHide();
+        hideTimer = win.setTimeout(hide, 250);
+      }
+
       doc.addEventListener('mouseover', function (event) {
         // Keep the toolbar visible while the pointer is on it.
         if (toolbar && (event.target === toolbar || toolbar.contains(event.target))) {
+          cancelHide();
           return;
         }
 
@@ -413,11 +433,13 @@
         var el = event.target.closest ? event.target.closest('[data-customize-type]') : null;
 
         if (el) {
+          cancelHide();
+
           if (el !== current) {
             showFor(el, doc);
           }
         } else {
-          hide();
+          scheduleHide();
         }
       });
 

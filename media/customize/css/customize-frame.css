@@ -186,7 +186,7 @@
   text-align: center;
 }
 
-.customize-dragging-active .customize-empty-position {
+.customize-empty-position.customize-dropzone-active {
   display: block;
 }
 
