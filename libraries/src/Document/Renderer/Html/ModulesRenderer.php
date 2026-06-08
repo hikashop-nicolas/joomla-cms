@@ -9,6 +9,7 @@
 
 namespace Joomla\CMS\Document\Renderer\Html;
 
+use Joomla\CMS\Customize\CustomizeMode;
 use Joomla\CMS\Document\DocumentRenderer;
 use Joomla\CMS\Event\Module;
 use Joomla\CMS\Factory;
@@ -47,8 +48,21 @@ class ModulesRenderer extends DocumentRenderer
         $frontediting = ($app->isClient('site') && $app->get('frontediting', 1) && !$user->guest);
         $menusEditing = ($app->get('frontediting', 1) == 2) && $user->authorise('core.edit', 'com_menus');
 
+        $customize = CustomizeMode::isActive();
+
         foreach (ModuleHelper::getModules($position) as $mod) {
             $moduleHtml = $renderer->render($mod, $params, $content);
+
+            // In customize mode, mark each module's first tag so the editor can target it (no extra wrapper).
+            if ($customize && trim($moduleHtml) !== '') {
+                $attrs = ' data-customize-type="module"'
+                    . ' data-customize-id="' . (int) $mod->id . '"'
+                    . ' data-customize-position="' . htmlspecialchars($position, ENT_QUOTES) . '"'
+                    . ' data-customize-module="' . htmlspecialchars($mod->module, ENT_QUOTES) . '"'
+                    . ' data-customize-name="' . htmlspecialchars($mod->title, ENT_QUOTES) . '"';
+
+                $moduleHtml = preg_replace('/^(\s*<[a-zA-Z][^>]*?)(\s*\/?>)/', '$1' . $attrs . '$2', $moduleHtml, 1);
+            }
 
             if ($frontediting && trim($moduleHtml) != '' && $user->authorise('module.edit.frontend', 'com_modules.module.' . $mod->id)) {
                 $displayData = ['moduleHtml' => &$moduleHtml, 'module' => $mod, 'position' => $position, 'menusediting' => $menusEditing];
@@ -56,6 +70,13 @@ class ModulesRenderer extends DocumentRenderer
             }
 
             $buffer .= $moduleHtml;
+        }
+
+        // In customize mode, a position with no modules still gets a (drag-revealed) drop zone.
+        if ($customize && trim($buffer) === '') {
+            $buffer = '<div class="customize-empty-position" data-customize-dropzone="module" data-customize-droppos="'
+                . htmlspecialchars($position, ENT_QUOTES) . '">'
+                . htmlspecialchars($position) . '</div>';
         }
 
         // Dispatch onAfterRenderModules event
