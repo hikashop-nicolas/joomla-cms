@@ -60,6 +60,95 @@ final class Module extends CMSPlugin implements SubscriberInterface
     }
 
     /**
+     * Reorder a menu item relative to a sibling, using the nested-set move.
+     *
+     * @param   array  $payload  The request payload (id, reference, position).
+     *
+     * @return  string  JSON result.
+     *
+     * @since   1.0.0
+     */
+    private function doMoveMenuItem(array $payload): string
+    {
+        $id        = (int) ($payload['id'] ?? 0);
+        $reference = (int) ($payload['reference'] ?? 0);
+        $position  = (($payload['position'] ?? 'after') === 'before') ? 'before' : 'after';
+
+        if (
+            $id <= 0 || $reference <= 0 || $id === $reference
+            || !$this->getApplication()->getIdentity()->authorise('core.edit', 'com_menus')
+        ) {
+            return $this->fail(Text::_('PLG_CUSTOMIZE_MODULE_ERROR_INVALID'));
+        }
+
+        $table = $this->getApplication()->bootComponent('com_menus')->getMVCFactory()
+            ->createTable('Menu', 'Administrator');
+
+        if (!$table || !$table->load($id) || !$table->moveByReference($reference, $position, $id)) {
+            return $this->fail(($table ? $table->getError() : '') ?: Text::_('PLG_CUSTOMIZE_MODULE_ERROR_SAVE'));
+        }
+
+        return json_encode(['success' => true]);
+    }
+
+    /**
+     * Rename a menu item (its displayed link text).
+     *
+     * @param   array  $payload  The request payload (id, title).
+     *
+     * @return  string  JSON result.
+     *
+     * @since   1.0.0
+     */
+    private function doSaveMenuItem(array $payload): string
+    {
+        $id    = (int) ($payload['id'] ?? 0);
+        $title = trim(strip_tags((string) ($payload['title'] ?? '')));
+
+        if ($id <= 0 || $title === '' || !$this->getApplication()->getIdentity()->authorise('core.edit', 'com_menus')) {
+            return $this->fail(Text::_('PLG_CUSTOMIZE_MODULE_ERROR_INVALID'));
+        }
+
+        $db    = Factory::getContainer()->get(DatabaseInterface::class);
+        $query = $db->createQuery()
+            ->update($db->quoteName('#__menu'))
+            ->set($db->quoteName('title') . ' = :title')
+            ->where($db->quoteName('id') . ' = :id')
+            ->bind(':title', $title)
+            ->bind(':id', $id, ParameterType::INTEGER);
+        $db->setQuery($query)->execute();
+
+        return json_encode(['success' => true]);
+    }
+
+    /**
+     * Delete a menu item (and, by nested-set semantics, any children).
+     *
+     * @param   array  $payload  The request payload (id).
+     *
+     * @return  string  JSON result.
+     *
+     * @since   1.0.0
+     */
+    private function doDeleteMenuItem(array $payload): string
+    {
+        $id = (int) ($payload['id'] ?? 0);
+
+        if ($id <= 0 || !$this->getApplication()->getIdentity()->authorise('core.delete', 'com_menus')) {
+            return $this->fail(Text::_('PLG_CUSTOMIZE_MODULE_ERROR_INVALID'));
+        }
+
+        $table = $this->getApplication()->bootComponent('com_menus')->getMVCFactory()
+            ->createTable('Menu', 'Administrator');
+
+        if (!$table || !$table->delete($id)) {
+            return $this->fail(($table ? $table->getError() : '') ?: Text::_('PLG_CUSTOMIZE_MODULE_ERROR_SAVE'));
+        }
+
+        return json_encode(['success' => true]);
+    }
+
+    /**
      * Declare extra customize attributes for a module being rendered. Custom (mod_custom) modules
      * get a "custom" flag that surfaces the in-place "Edit content" button.
      *
@@ -100,7 +189,22 @@ final class Module extends CMSPlugin implements SubscriberInterface
         }
 
         $payload = json_decode($input->get('payload', '', 'raw'), true) ?: [];
-        $id      = (int) ($payload['id'] ?? 0);
+
+        // Menu-item actions operate on com_menus items, not the module record.
+        $menuActions = [
+            'movemenuitem'   => 'doMoveMenuItem',
+            'savemenuitem'   => 'doSaveMenuItem',
+            'deletemenuitem' => 'doDeleteMenuItem',
+        ];
+        $action = $input->getCmd('action', '');
+
+        if (isset($menuActions[$action])) {
+            $event->addResult($this->{$menuActions[$action]}($payload));
+
+            return;
+        }
+
+        $id = (int) ($payload['id'] ?? 0);
 
         if ($id <= 0 || !$this->getApplication()->getIdentity()->authorise('core.edit', 'com_modules.module.' . $id)) {
             $event->addResult($this->fail(Text::_('JERROR_ALERTNOAUTHOR')));
@@ -188,6 +292,9 @@ final class Module extends CMSPlugin implements SubscriberInterface
             'PLG_CUSTOMIZE_MODULE_CONTENT_SAVED',
             'PLG_CUSTOMIZE_MODULE_CONTENT_TOO_LARGE',
             'PLG_CUSTOMIZE_MODULE_LOAD_FAILED',
+            'PLG_CUSTOMIZE_MODULE_MENUITEM',
+            'PLG_CUSTOMIZE_MODULE_MENUITEM_SAVED',
+            'PLG_CUSTOMIZE_MODULE_MENU_REORDERED',
             'PLG_CUSTOMIZE_MODULE_PUBLISHED',
             'PLG_CUSTOMIZE_MODULE_SAVED',
             'PLG_CUSTOMIZE_MODULE_SAVE_ERROR',

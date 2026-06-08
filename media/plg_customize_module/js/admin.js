@@ -155,4 +155,176 @@
   // Only shown on custom modules (data-customize-custom emitted by the renderer).
   JC.registerButton('module', { id: 'content', label: t('PLG_CUSTOMIZE_MODULE_BTN_CONTENT', 'Edit content'), order: 20, requires: 'custom', onClick: editContent });
   JC.registerButton('module', { id: 'advanced', label: t('PLG_CUSTOMIZE_MODULE_BTN_ADVANCED', 'Advanced'), order: 90, onClick: openModuleEditor });
+
+  // --- Menu items (reorder by dragging) ---------------------------------------
+  // Tag each <li class="item-<id>"> in a menu module as a draggable menu-item area.
+
+  function siblingMenuItem(el, dir) {
+    var n = el[dir];
+    while (n && n.getAttribute('data-customize-type') !== 'menuitem') {
+      n = n[dir];
+    }
+    return n;
+  }
+
+  function openMenuItemEditor(ctx) {
+    window.open('index.php?option=com_menus&task=item.edit&id=' + encodeURIComponent(ctx.data.id), '_blank', 'noopener');
+  }
+
+  // Rename a menu item in place (edit its link text).
+  function editMenuItemName(ctx) {
+    var doc = ctx.doc;
+    var li = ctx.el;
+
+    if (li.getAttribute('data-customize-editing') === '1') {
+      return;
+    }
+
+    var target = li.querySelector('a') || li;
+    var original = target.textContent;
+
+    li.setAttribute('data-customize-editing', '1');
+    JC.emit('customize:edit-start');
+    target.setAttribute('contenteditable', 'true');
+    target.classList.add('customize-editing');
+    target.focus();
+
+    function blockNav(e) { e.preventDefault(); }
+    target.addEventListener('click', blockNav);
+
+    var bar = JC.ui.makeBar(doc);
+    target.parentNode.insertBefore(bar.el, target.nextSibling);
+
+    function teardown() {
+      target.removeAttribute('contenteditable');
+      target.classList.remove('customize-editing');
+      target.removeEventListener('click', blockNav);
+      target.removeEventListener('keydown', onKey);
+      li.removeAttribute('data-customize-editing');
+      JC.emit('customize:edit-end');
+      if (bar.el.parentNode) {
+        bar.el.parentNode.removeChild(bar.el);
+      }
+    }
+
+    function cancel() {
+      target.textContent = original;
+      teardown();
+    }
+
+    function save() {
+      var value = target.textContent.trim();
+
+      if (!value) {
+        return;
+      }
+
+      JC.ui.saving(bar.save);
+
+      ctx.callAction('module', 'savemenuitem', { id: ctx.data.id, title: value }).then(function (res) {
+        if (res && res.success) {
+          target.textContent = value;
+          li.setAttribute('data-customize-name', value);
+          teardown();
+          JC.ui.toast(doc, t('PLG_CUSTOMIZE_MODULE_MENUITEM_SAVED', 'Menu item saved.'));
+        } else {
+          JC.ui.resetSave(bar.save);
+          JC.ui.toast(doc, failMessage(res));
+        }
+      }).catch(function () {
+        JC.ui.resetSave(bar.save);
+        JC.ui.toast(doc, t('PLG_CUSTOMIZE_MODULE_SAVE_ERROR', 'Save error.'));
+      });
+    }
+
+    function onKey(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        save();
+      } else if (e.key === 'Escape') {
+        cancel();
+      }
+    }
+
+    target.addEventListener('keydown', onKey);
+    bar.save.addEventListener('click', save);
+    bar.cancel.addEventListener('click', cancel);
+  }
+
+  JC.on('customize:frame-ready', function (e) {
+    var doc = e.detail && e.detail.doc;
+
+    if (!doc) {
+      return;
+    }
+
+    Array.prototype.forEach.call(doc.querySelectorAll('[data-customize-module="mod_menu"] li'), function (li) {
+      var match = /(?:^|\s)item-(\d+)(?:\s|$)/.exec(li.className);
+
+      if (!match || li.hasAttribute('data-customize-type')) {
+        return;
+      }
+
+      var link = li.querySelector('a, span');
+      li.setAttribute('data-customize-type', 'menuitem');
+      li.setAttribute('data-customize-id', match[1]);
+      li.setAttribute('data-customize-name', (link ? link.textContent : '').trim());
+    });
+  });
+
+  JC.registerAreaType('menuitem', {
+    label: t('PLG_CUSTOMIZE_MODULE_MENUITEM', 'Menu item'),
+    draggable: true,
+    onReorder: function (info) {
+      var el = info.dragged;
+      var reference;
+      var position;
+      var prev = siblingMenuItem(el, 'previousElementSibling');
+
+      if (prev) {
+        reference = prev.getAttribute('data-customize-id');
+        position = 'after';
+      } else {
+        var next = siblingMenuItem(el, 'nextElementSibling');
+        if (!next) {
+          return;
+        }
+        reference = next.getAttribute('data-customize-id');
+        position = 'before';
+      }
+
+      JC.callAction('module', 'movemenuitem', {
+        id: el.getAttribute('data-customize-id'),
+        reference: reference,
+        position: position
+      }).then(function (res) {
+        if (res && res.success) {
+          JC.ui.toast(info.doc, t('PLG_CUSTOMIZE_MODULE_MENU_REORDERED', 'Menu reordered.'));
+        } else {
+          JC.ui.toast(info.doc, failMessage(res));
+          reloadFrame();
+        }
+      }).catch(function () {
+        JC.ui.toast(info.doc, t('PLG_CUSTOMIZE_MODULE_SAVE_ERROR', 'Save error.'));
+        reloadFrame();
+      });
+    },
+    onDelete: function (info) {
+      return JC.callAction('module', 'deletemenuitem', { id: info.el.getAttribute('data-customize-id') }).then(function (res) {
+        if (res && res.success) {
+          reloadFrame();
+          return true;
+        }
+
+        JC.ui.toast(info.doc, failMessage(res));
+        return false;
+      }).catch(function () {
+        JC.ui.toast(info.doc, t('PLG_CUSTOMIZE_MODULE_SAVE_ERROR', 'Save error.'));
+        return false;
+      });
+    }
+  });
+
+  JC.registerButton('menuitem', { id: 'edit', label: t('PLG_CUSTOMIZE_MODULE_BTN_EDIT', 'Edit'), order: 10, onClick: editMenuItemName });
+  JC.registerButton('menuitem', { id: 'advanced', label: t('PLG_CUSTOMIZE_MODULE_BTN_ADVANCED', 'Advanced'), order: 90, onClick: openMenuItemEditor });
 }(window));
