@@ -396,8 +396,41 @@
       toolbar.style.left = left + 'px';
     }
 
+    // Carry customize=1 across in-iframe navigation (same-origin links and forms), so the mode
+    // persists without making it sticky in the session (which would leak into normal browsing).
+    function carryCustomize(doc) {
+      var host = doc.location.host;
+
+      Array.prototype.forEach.call(doc.querySelectorAll('a[href]'), function (a) {
+        if (a.host !== host) {
+          return;
+        }
+
+        var href = a.getAttribute('href');
+
+        if (!href || href.charAt(0) === '#' || a.search.indexOf('customize=1') !== -1) {
+          return;
+        }
+
+        a.search = (a.search ? a.search + '&' : '?') + 'customize=1';
+      });
+
+      Array.prototype.forEach.call(doc.querySelectorAll('form'), function (form) {
+        if (form.querySelector('input[name="customize"]')) {
+          return;
+        }
+
+        var input = doc.createElement('input');
+        input.type = 'hidden';
+        input.name = 'customize';
+        input.value = '1';
+        form.appendChild(input);
+      });
+    }
+
     function wire(doc) {
       buildChrome(doc);
+      carryCustomize(doc);
 
       var areas = doc.querySelectorAll('[data-customize-type]');
       setStatus(JC.text('COM_MENUS_CUSTOMIZE_STATUS_ACTIVE', 'Customize mode active · %s editable area(s)').replace('%s', areas.length), true);

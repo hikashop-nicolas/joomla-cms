@@ -18,9 +18,9 @@ use Joomla\CMS\Application\CMSApplicationInterface;
 /**
  * Tracks whether the visual frontend "Customize" mode is active for the current request.
  *
- * Admin and site use separate sessions, so the mode is carried into the frontend iframe by the
- * "customize=1" URL parameter on first load and then kept sticky in the frontend session, so that
- * subsequent in-iframe navigation keeps emitting the editable-area markup without re-passing the flag.
+ * The mode is active only when the request carries the "customize=1" URL parameter. It is NOT made
+ * sticky in the session, so normal browsing is never affected; the admin Customize view's engine
+ * carries the flag across in-iframe navigation (links and forms) instead.
  *
  * Activation is intentionally not gated by user group: a frontend page in customize mode only gains
  * harmless, invisible data-customize-* wrappers. All editing UI lives in the login-protected admin
@@ -31,14 +31,6 @@ use Joomla\CMS\Application\CMSApplicationInterface;
 final class CustomizeMode
 {
     /**
-     * Session key holding the sticky customize flag for the current (frontend) session.
-     *
-     * @var    string
-     * @since  __DEPLOY_VERSION__
-     */
-    public const SESSION_KEY = 'customize.active';
-
-    /**
      * Resolved state for the current request.
      *
      * @var    boolean
@@ -47,7 +39,7 @@ final class CustomizeMode
     private static $active = false;
 
     /**
-     * Resolve the customize state for the current request from the URL flag and the session.
+     * Resolve the customize state for the current request from the URL flag.
      *
      * @param   CMSApplicationInterface  $app  The current application.
      *
@@ -57,13 +49,7 @@ final class CustomizeMode
      */
     public static function detect(CMSApplicationInterface $app): void
     {
-        $session = $app->getSession();
-
-        if ($app->getInput()->getInt('customize', 0) === 1) {
-            $session->set(self::SESSION_KEY, true);
-        }
-
-        self::$active = (bool) $session->get(self::SESSION_KEY, false);
+        self::$active = $app->getInput()->getInt('customize', 0) === 1;
     }
 
     /**
@@ -76,20 +62,5 @@ final class CustomizeMode
     public static function isActive(): bool
     {
         return self::$active;
-    }
-
-    /**
-     * Turn customize mode off for the current session.
-     *
-     * @param   CMSApplicationInterface  $app  The current application.
-     *
-     * @return  void
-     *
-     * @since   __DEPLOY_VERSION__
-     */
-    public static function deactivate(CMSApplicationInterface $app): void
-    {
-        $app->getSession()->set(self::SESSION_KEY, false);
-        self::$active = false;
     }
 }
