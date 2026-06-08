@@ -350,7 +350,6 @@
       var label = doc.createElement('span');
       label.className = 'customize-toolbar-label';
       label.textContent = (areaType.label || type) + (name ? ' · ' + name : '');
-      toolbar.appendChild(label);
 
       // Draggable area types (e.g. modules) use the toolbar title as the drag handle, leaving the
       // element body free for editing its contents. The owning plugin handles the drop and save.
@@ -390,7 +389,10 @@
         actions.appendChild(btn);
       });
 
+      // Order: action buttons first (left), then the title/drag handle (right), so the buttons are
+      // easy to reach even on narrow elements like a short translated string.
       toolbar.appendChild(actions);
+      toolbar.appendChild(label);
       toolbar.style.display = 'flex';
       toolbar.style.top = top + 'px';
       toolbar.style.left = left + 'px';

@@ -256,10 +256,11 @@ class Language extends BaseLanguage
                 }
 
                 $this->used[$key][] = $caller;
-            } elseif (CustomizeMode::isActive()) {
+            } elseif (CustomizeMode::isActive() && strncmp($key, 'DATE_FORMAT', 11) !== 0) {
                 // Wrap each translation with its key so the customize editor can offer an in-place
                 // language override. Private-use markers survive JSON/attribute contexts; the editor
-                // strips them. \u{E000}<key>\u{E001}<text>\u{E002}.
+                // strips them. \u{E000}<key>\u{E001}<text>\u{E002}. Date format strings are excluded:
+                // their key letters would be read as format codes by the date formatter.
                 $string = "\u{E000}" . $key . "\u{E001}" . $string . "\u{E002}";
             }
         } else {

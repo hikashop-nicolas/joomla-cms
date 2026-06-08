@@ -37,12 +37,15 @@
     return value.replace(OPEN_RE, '').split(END).join('');
   }
 
-  // Parse a marker string into a fragment of (possibly nested) lang spans.
+  // Parse a marker string into a fragment of (possibly nested) lang spans. Returns the fragment and
+  // whether the markers balanced (every START closed, no orphan END). When a translation contains
+  // HTML, its START and END land in different text nodes, so a single node is unbalanced.
   function parseInto(doc, text) {
     var frag = doc.createDocumentFragment();
     var stack = [frag];
     var i = 0;
     var buf = '';
+    var orphan = false;
 
     function flush() {
       if (buf) {
@@ -76,6 +79,8 @@
         flush();
         if (stack.length > 1) {
           stack.pop();
+        } else {
+          orphan = true;
         }
         i++;
       } else {
@@ -85,7 +90,7 @@
     }
 
     flush();
-    return frag;
+    return { frag: frag, balanced: stack.length === 1 && !orphan };
   }
 
   // A lang span that contains another lang span is a template; unwrap it (keep leaves editable).
@@ -103,11 +108,20 @@
   }
 
   function spanify(doc, node) {
-    var frag = parseInto(doc, node.nodeValue);
-    unwrapTemplates(frag);
+    var result = parseInto(doc, node.nodeValue);
+
+    // Unbalanced markers (a translation split across nodes by embedded HTML) can't map cleanly to one
+    // key, so just clean the text rather than make a misleading partial edit area.
+    if (!result.balanced) {
+      node.nodeValue = stripMarkers(node.nodeValue);
+
+      return;
+    }
+
+    unwrapTemplates(result.frag);
 
     if (node.parentNode) {
-      node.parentNode.replaceChild(frag, node);
+      node.parentNode.replaceChild(result.frag, node);
     }
   }
 
@@ -142,7 +156,7 @@
     var node;
 
     while ((node = walker.nextNode())) {
-      if (node.nodeValue.indexOf(START) === -1) {
+      if (node.nodeValue.indexOf(START) === -1 && node.nodeValue.indexOf(END) === -1) {
         continue;
       }
 
@@ -176,7 +190,7 @@
       mutations.forEach(function (m) {
         Array.prototype.forEach.call(m.addedNodes, function (n) {
           if (n.nodeType === 3) {
-            if (n.nodeValue.indexOf(START) === -1) {
+            if (n.nodeValue.indexOf(START) === -1 && n.nodeValue.indexOf(END) === -1) {
               return;
             }
 
@@ -185,7 +199,8 @@
             } else {
               spanify(doc, n);
             }
-          } else if (n.nodeType === 1 && n.textContent && n.textContent.indexOf(START) !== -1) {
+          } else if (n.nodeType === 1 && n.textContent
+            && (n.textContent.indexOf(START) !== -1 || n.textContent.indexOf(END) !== -1)) {
             instrument(doc, n);
           }
         });
