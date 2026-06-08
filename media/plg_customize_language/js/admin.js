@@ -148,6 +148,25 @@
     });
   }
 
+  // Joomla.Text._ in the iframe returns markered strings (the script registered them before we could
+  // clean the page), so dynamically-rendered messages (form validation, alerts) would show markers.
+  // Wrap it to strip markers on read, handling them like the static DOM does.
+  function patchJoomlaText(doc) {
+    var win = doc.defaultView;
+    var store = win.Joomla && win.Joomla.Text;
+
+    if (!store || typeof store._ !== 'function' || store.customizePatched) {
+      return;
+    }
+
+    var original = store._;
+    store._ = function (key, def) {
+      var s = original.call(this, key, def);
+      return (typeof s === 'string' && s.indexOf(START) !== -1) ? stripMarkers(s) : s;
+    };
+    store.customizePatched = true;
+  }
+
   // Edit a translated string in place; saving writes a language override.
   function editLang(ctx) {
     var doc = ctx.doc;
@@ -168,10 +187,28 @@
     var bar = JC.ui.makeBar(doc);
     span.parentNode.insertBefore(bar.el, span.nextSibling);
 
+    // The string may sit inside a link or button; suppress its activation while editing so clicking
+    // to place the caret doesn't navigate or submit.
+    var interactive = span.closest ? span.closest('a, button') : null;
+
+    function blockClick(ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+    }
+
+    span.addEventListener('click', blockClick, true);
+    if (interactive) {
+      interactive.addEventListener('click', blockClick, true);
+    }
+
     function teardown() {
       span.removeAttribute('contenteditable');
       span.classList.remove('customize-editing');
       span.removeEventListener('keydown', onKey);
+      span.removeEventListener('click', blockClick, true);
+      if (interactive) {
+        interactive.removeEventListener('click', blockClick, true);
+      }
       span.removeAttribute('data-customize-editing');
       JC.emit('customize:edit-end');
       if (bar.el.parentNode) {
@@ -221,6 +258,7 @@
 
   JC.on('customize:frame-ready', function (e) {
     if (e.detail && e.detail.doc) {
+      patchJoomlaText(e.detail.doc);
       instrument(e.detail.doc);
     }
   });
