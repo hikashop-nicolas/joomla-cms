@@ -5,7 +5,9 @@
  * markers (U+E000 key U+E001 text U+E002). This turns those markers into editable "lang" areas in
  * the iframe (and strips them from attributes), and saves edits as a Joomla language override.
  * Nested translations (a string composed from other translated strings, e.g. dates) nest markers;
- * only leaf strings are made editable, template strings are unwrapped.
+ * only leaf strings are made editable, template strings are unwrapped. A MutationObserver runs the
+ * same instrumentation on dynamically inserted content (form validation messages, alerts, AJAX),
+ * so those become editable too.
  *
  * @copyright   (C) 2026 Open Source Matters, Inc. <https://www.joomla.org>
  * @license     GNU General Public License version 2 or later; see LICENSE.txt
@@ -28,6 +30,7 @@
   var END = String.fromCharCode(0xE002);
   var OPEN_RE = new RegExp(START + '[^' + SEP + ']*' + SEP, 'g');
   var SKIP = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, OPTION: 1, TITLE: 1, NOSCRIPT: 1 };
+  var editing = false;
 
   // Remove all markers, keeping the text (handles nesting): drop every "START key SEP" and END.
   function stripMarkers(value) {
@@ -108,9 +111,18 @@
     }
   }
 
-  function instrument(doc) {
-    // Strip markers from attribute values and the document title (kept as text, not editable).
-    Array.prototype.forEach.call(doc.querySelectorAll('*'), function (el) {
+  // Instrument a subtree (the whole body on load, or a freshly inserted node): strip markers from
+  // attributes, turn marker text into editable spans (strip where a span can't go).
+  function instrument(doc, root) {
+    root = root || doc.body;
+
+    var els = root.nodeType === 1 ? [root] : [];
+
+    if (root.querySelectorAll) {
+      els = els.concat(Array.prototype.slice.call(root.querySelectorAll('*')));
+    }
+
+    els.forEach(function (el) {
       for (var i = 0; i < el.attributes.length; i++) {
         var attr = el.attributes[i];
 
@@ -120,12 +132,12 @@
       }
     });
 
-    if (doc.title && doc.title.indexOf(START) !== -1) {
+    if (root === doc.body && doc.title && doc.title.indexOf(START) !== -1) {
       doc.title = stripMarkers(doc.title);
     }
 
-    // Turn markers in body text nodes into editable spans; strip them where a span can't go.
-    var walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null);
+    var walkRoot = root.nodeType === 1 ? root : doc.body;
+    var walker = doc.createTreeWalker(walkRoot, NodeFilter.SHOW_TEXT, null);
     var targets = [];
     var node;
 
@@ -148,23 +160,39 @@
     });
   }
 
-  // Joomla.Text._ in the iframe returns markered strings (the script registered them before we could
-  // clean the page), so dynamically-rendered messages (form validation, alerts) would show markers.
-  // Wrap it to strip markers on read, handling them like the static DOM does.
-  function patchJoomlaText(doc) {
+  // Instrument dynamically inserted content (validation messages, AJAX, etc.) the same way.
+  function observe(doc) {
     var win = doc.defaultView;
-    var store = win.Joomla && win.Joomla.Text;
 
-    if (!store || typeof store._ !== 'function' || store.customizePatched) {
+    if (!win.MutationObserver) {
       return;
     }
 
-    var original = store._;
-    store._ = function (key, def) {
-      var s = original.call(this, key, def);
-      return (typeof s === 'string' && s.indexOf(START) !== -1) ? stripMarkers(s) : s;
-    };
-    store.customizePatched = true;
+    var obs = new win.MutationObserver(function (mutations) {
+      if (editing) {
+        return;
+      }
+
+      mutations.forEach(function (m) {
+        Array.prototype.forEach.call(m.addedNodes, function (n) {
+          if (n.nodeType === 3) {
+            if (n.nodeValue.indexOf(START) === -1) {
+              return;
+            }
+
+            if (n.parentNode && SKIP[n.parentNode.nodeName]) {
+              n.nodeValue = stripMarkers(n.nodeValue);
+            } else {
+              spanify(doc, n);
+            }
+          } else if (n.nodeType === 1 && n.textContent && n.textContent.indexOf(START) !== -1) {
+            instrument(doc, n);
+          }
+        });
+      });
+    });
+
+    obs.observe(doc.body, { childList: true, subtree: true });
   }
 
   // Edit a translated string in place; saving writes a language override.
@@ -177,6 +205,7 @@
     }
 
     span.setAttribute('data-customize-editing', '1');
+    editing = true;
     JC.emit('customize:edit-start');
 
     var original = span.textContent;
@@ -184,12 +213,13 @@
     span.classList.add('customize-editing');
     span.focus();
 
-    var bar = JC.ui.makeBar(doc);
-    span.parentNode.insertBefore(bar.el, span.nextSibling);
-
-    // The string may sit inside a link or button; suppress its activation while editing so clicking
-    // to place the caret doesn't navigate or submit.
+    // The string may sit inside a link or button; suppress its activation while editing, and place
+    // the Save/Cancel bar OUTSIDE that element so its own clicks are not blocked.
     var interactive = span.closest ? span.closest('a, button') : null;
+    var anchor = interactive || span;
+
+    var bar = JC.ui.makeBar(doc);
+    anchor.parentNode.insertBefore(bar.el, anchor.nextSibling);
 
     function blockClick(ev) {
       ev.preventDefault();
@@ -210,6 +240,7 @@
         interactive.removeEventListener('click', blockClick, true);
       }
       span.removeAttribute('data-customize-editing');
+      editing = false;
       JC.emit('customize:edit-end');
       if (bar.el.parentNode) {
         bar.el.parentNode.removeChild(bar.el);
@@ -258,8 +289,8 @@
 
   JC.on('customize:frame-ready', function (e) {
     if (e.detail && e.detail.doc) {
-      patchJoomlaText(e.detail.doc);
       instrument(e.detail.doc);
+      observe(e.detail.doc);
     }
   });
 
