@@ -1,0 +1,201 @@
+/**
+ * Joomla Customize - overlay UI injected into the frontend iframe document.
+ *
+ * @copyright   (C) 2026 Open Source Matters, Inc. <https://www.joomla.org>
+ * @license     GNU General Public License version 2 or later; see LICENSE.txt
+ */
+
+.customize-area-outline {
+  position: absolute;
+  z-index: 99998;
+  pointer-events: none;
+  border: 1px solid #2a7de1;
+}
+
+.customize-toolbar {
+  position: absolute;
+  z-index: 99999;
+  transform: translateY(-100%);
+  display: flex;
+  align-items: stretch;
+  gap: 0.25rem;
+  max-width: 90vw;
+  padding: 0;
+  font: 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #2a7de1;
+  color: #fff;
+  border-radius: 3px 3px 0 0;
+  box-shadow: 0 -1px 4px rgba(0, 0, 0, 0.2);
+}
+
+.customize-toolbar-label {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.customize-toolbar-actions {
+  display: flex;
+  align-items: stretch;
+}
+
+.customize-btn {
+  appearance: none;
+  border: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.3);
+  background: transparent;
+  color: #fff;
+  padding: 4px 10px;
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.customize-btn:hover,
+.customize-btn:focus {
+  background: rgba(255, 255, 255, 0.18);
+  outline: none;
+}
+
+/* Inline editing chrome injected into the iframe by customize plugins. */
+.customize-inline-bar {
+  position: relative;
+  z-index: 99999;
+  display: flex;
+  gap: 6px;
+  margin: 6px 0;
+}
+
+.customize-action {
+  border: 0;
+  border-radius: 3px;
+  padding: 4px 12px;
+  font: 13px sans-serif;
+  color: #fff;
+  cursor: pointer;
+}
+
+.customize-action-save {
+  background: #198754;
+}
+
+.customize-action-cancel {
+  background: #6c757d;
+}
+
+.customize-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 100001;
+  padding: 8px 14px;
+  border-radius: 4px;
+  font: 13px sans-serif;
+  background: #212529;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.customize-popover {
+  position: absolute;
+  z-index: 100000;
+  width: 260px;
+  padding: 10px 12px;
+  border: 1px solid #2a7de1;
+  border-radius: 4px;
+  font: 13px sans-serif;
+  background: #fff;
+  color: #212529;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.customize-popover select,
+.customize-popover input[type="text"] {
+  width: 100%;
+  margin: 2px 0 4px;
+  box-sizing: border-box;
+}
+
+.customize-field-label {
+  margin-top: 6px;
+  font-weight: 600;
+}
+
+.customize-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.customize-link {
+  margin: 0 0 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #2a7de1;
+  font: 12px sans-serif;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.customize-editor {
+  width: 100%;
+  min-height: 160px;
+}
+
+.customize-editing {
+  outline: 2px solid #2a7de1;
+}
+
+.customize-draggable {
+  cursor: move;
+}
+
+.customize-dragging {
+  opacity: 0.4;
+}
+
+/* Every valid drop target while a drag is in progress (pale blue dashed). */
+.customize-droppable {
+  outline: 2px dashed #9ec5f0;
+  outline-offset: -2px;
+}
+
+/* The target currently under the pointer (stronger blue). */
+.customize-drop-target {
+  outline: 2px dashed #2a7de1;
+  outline-offset: -2px;
+}
+
+/* Drop zone emitted by the core renderer for a position that has no module yet.
+   Hidden until a drag begins (the position plugin flags the body). */
+.customize-empty-position {
+  display: none;
+  margin: 4px 0;
+  padding: 14px;
+  border: 2px dashed #9ec5f0;
+  border-radius: 3px;
+  color: #6c9fe0;
+  font: 12px sans-serif;
+  text-align: center;
+}
+
+.customize-dragging-active .customize-empty-position {
+  display: block;
+}
+
+.customize-image-placeholder {
+  display: inline-block;
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border: 1px dashed #2a7de1;
+  border-radius: 3px;
+  color: #2a7de1;
+  font: 12px sans-serif;
+}

@@ -1,0 +1,66 @@
+/**
+ * Joomla Customize - admin host layout (the com_menus customize view).
+ *
+ * @copyright   (C) 2026 Open Source Matters, Inc. <https://www.joomla.org>
+ * @license     GNU General Public License version 2 or later; see LICENSE.txt
+ */
+
+.customize-host {
+  display: flex;
+  gap: 0;
+  height: calc(100vh - 130px);
+  min-height: 420px;
+  border: 1px solid var(--template-bg-dark, #dee2e6);
+  border-radius: 0.25rem;
+  overflow: hidden;
+}
+
+.customize-stage {
+  flex: 1 1 auto;
+  position: relative;
+  background: #fff;
+}
+
+.customize-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+.customize-empty {
+  padding: 2rem;
+  color: #6c757d;
+}
+
+.customize-panel {
+  flex: 0 0 280px;
+  border-left: 1px solid var(--template-bg-dark, #dee2e6);
+  background: var(--template-bg-light, #f8f9fa);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow-y: auto;
+}
+
+.customize-status {
+  font-size: 0.875rem;
+  line-height: 1.4;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.25rem;
+  background: #fff;
+  border: 1px solid #dee2e6;
+}
+
+.customize-status.is-ok {
+  border-color: #198754;
+  color: #0f5132;
+  background: #d1e7dd;
+}
+
+.customize-status.is-warn {
+  border-color: #ffc107;
+  color: #664d03;
+  background: #fff3cd;
+}

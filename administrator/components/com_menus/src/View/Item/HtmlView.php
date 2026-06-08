@@ -210,6 +210,14 @@ class HtmlView extends BaseHtmlView
                 ->listCheck(false);
         }
 
+        // Open the visual Customize view for a saved site menu item that renders its own frontend page.
+        if (!$isNew && $clientId != 1 && $this->isPreviewable()) {
+            $toolbar->linkButton('customize', 'COM_MENUS_TOOLBAR_CUSTOMIZE')
+                ->url('index.php?option=com_menus&view=customize&id=' . (int) $this->item->id)
+                ->buttonClass('btn btn-info')
+                ->icon('icon-paint-brush');
+        }
+
         if ($isNew) {
             $toolbar->cancel('item.cancel', 'JTOOLBAR_CANCEL');
         } else {
@@ -235,6 +243,19 @@ class HtmlView extends BaseHtmlView
 
         $toolbar->inlinehelp();
         $toolbar->help($help->key, $help->local, $url);
+    }
+
+    /**
+     * Whether this menu item renders its own frontend page that can be visually customized.
+     * Only component items have a previewable frontend route; url/alias/separator/heading do not.
+     *
+     * @return  boolean
+     *
+     * @since   __DEPLOY_VERSION__
+     */
+    protected function isPreviewable()
+    {
+        return isset($this->item->type) && $this->item->type === 'component' && !empty($this->item->link);
     }
 
     /**

@@ -13,6 +13,7 @@ use Joomla\Application\Web\WebClient;
 use Joomla\CMS\Cache\CacheControllerFactoryAwareTrait;
 use Joomla\CMS\Cache\Controller\OutputController;
 use Joomla\CMS\Component\ComponentHelper;
+use Joomla\CMS\Customize\CustomizeMode;
 use Joomla\CMS\Event\Application\AfterDispatchEvent;
 use Joomla\CMS\Event\Application\AfterInitialiseDocumentEvent;
 use Joomla\CMS\Event\Application\AfterRouteEvent;
@@ -583,6 +584,16 @@ final class SiteApplication extends CMSApplication
         }
 
         parent::render();
+
+        // In customize mode, advertise to the admin Customize host that this frontend page is instrumented.
+        if (CustomizeMode::isActive()) {
+            $body = $this->getBody();
+
+            if (\is_string($body) && stripos($body, '</body>') !== false) {
+                $marker = "\n<!-- customize-mode:active -->\n<script>window.JoomlaCustomizeFrame = true;</script>\n";
+                $this->setBody(preg_replace('/<\/body>/i', $marker . '</body>', $body, 1));
+            }
+        }
     }
 
     /**
@@ -652,6 +663,13 @@ final class SiteApplication extends CMSApplication
             'onAfterRoute',
             new AfterRouteEvent('onAfterRoute', ['subject' => $this])
         );
+
+        // Visual customize mode: import the customize plugin group so its render hooks emit editable-area markup.
+        CustomizeMode::detect($this);
+
+        if (CustomizeMode::isActive()) {
+            PluginHelper::importPlugin('customize', null, true, $this->getDispatcher());
+        }
 
         $Itemid = $this->input->getInt('Itemid', 0);
         $this->authorise($Itemid);
