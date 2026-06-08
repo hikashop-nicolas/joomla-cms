@@ -309,6 +309,14 @@
       return (fallback != null) ? fallback : key;
     },
 
+    /**
+     * The admin host's side panel element (in the parent document), for plugins that add controls
+     * not tied to an on-page element (e.g. "Add module").
+     */
+    panel: function () {
+      return window.document.querySelector('.customize-panel');
+    },
+
     on: function (name, callback) {
       bus.addEventListener(name, callback);
       return this;

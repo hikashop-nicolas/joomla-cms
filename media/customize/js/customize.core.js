@@ -27,6 +27,7 @@
     var editing = false;
     var dragEl = null;
     var dragType = null;
+    var externalDrag = null;
 
     function setStatus(text, ok) {
       if (statusEl) {
@@ -141,7 +142,10 @@
 
     function addDropTarget(doc, target, acceptType) {
       target.addEventListener('dragover', function (e) {
-        if (dragEl && dragType === acceptType && dragEl !== target) {
+        var reorder = dragEl && dragType === acceptType && dragEl !== target;
+        var external = externalDrag && externalDrag.type === acceptType;
+
+        if (reorder || external) {
           e.preventDefault();
           target.classList.add('customize-drop-target');
         }
@@ -153,6 +157,13 @@
 
       target.addEventListener('drop', function (e) {
         target.classList.remove('customize-drop-target');
+
+        // An external source (e.g. the Add-module bar) dropping a brand new element of this type.
+        if (externalDrag && externalDrag.type === acceptType) {
+          e.preventDefault();
+          externalDrag.onDrop({ target: target, payload: externalDrag.payload, doc: doc });
+          return;
+        }
 
         if (!dragEl || dragType !== acceptType || dragEl === target) {
           return;
@@ -175,6 +186,30 @@
         }
       });
     }
+
+    // Let a control outside the iframe (e.g. the Add-module bar in the panel) drag a brand new
+    // element of `type` onto the page. Highlights the same drop targets as a reorder; onDrop is
+    // called with the chosen target so the caller can create the element there.
+    JC.beginExternalDrag = function (type, payload, onDrop) {
+      externalDrag = { type: type, payload: payload, onDrop: onDrop };
+      dragType = type;
+      var doc = frameDoc();
+
+      if (doc) {
+        highlightDroppables(doc, type, true);
+      }
+    };
+
+    JC.endExternalDrag = function () {
+      var doc = frameDoc();
+
+      if (doc && externalDrag) {
+        highlightDroppables(doc, externalDrag.type, false);
+      }
+
+      externalDrag = null;
+      dragType = null;
+    };
 
     function setupSortable(doc) {
       Array.prototype.forEach.call(doc.querySelectorAll('[data-customize-type], [data-customize-dropzone]'), function (target) {
