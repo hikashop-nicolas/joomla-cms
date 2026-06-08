@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<extension type="plugin" group="customize" method="upgrade">
+	<name>plg_customize_content</name>
+	<author>Joomla! Project</author>
+	<creationDate>2026-06</creationDate>
+	<copyright>(C) 2026 Open Source Matters, Inc.</copyright>
+	<license>GNU General Public License version 2 or later; see LICENSE.txt</license>
+	<authorEmail>admin@joomla.org</authorEmail>
+	<authorUrl>www.joomla.org</authorUrl>
+	<version>1.0.0</version>
+	<description>PLG_CUSTOMIZE_CONTENT_XML_DESCRIPTION</description>
+	<namespace path="src">Joomla\Plugin\Customize\Content</namespace>
+	<media destination="plg_customize_content" folder="media">
+		<folder>js</folder>
+	</media>
+	<files>
+		<folder plugin="content">services</folder>
+		<folder>src</folder>
+	</files>
+	<languages>
+		<language tag="en-GB">language/en-GB/plg_customize_content.ini</language>
+		<language tag="en-GB">language/en-GB/plg_customize_content.sys.ini</language>
+	</languages>
+</extension>
