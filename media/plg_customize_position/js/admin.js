@@ -58,43 +58,67 @@
     });
   }
 
-  // --- Sticky "move to another position" zone ---------------------------------
+  // --- Sticky drop zones while dragging a module ------------------------------
+  // Two bars appear while dragging: a blue "move to another position" bar at the bottom and a red
+  // "remove this module" bar at the top. Dropping the module on either greys it in place and turns
+  // that bar into a confirm step (a position picker, or a delete confirmation).
 
   var draggedModule = null;
-  var sticky = null;
+  var moveBar = null;
+  var deleteBar = null;
   var pending = null;
 
   function isModuleEl(el) {
     return el && el.getAttribute('data-customize-type') === 'module';
   }
 
-  function removeSticky() {
-    if (sticky && sticky.parentNode) {
-      sticky.parentNode.removeChild(sticky);
-    }
-    sticky = null;
+  function removeBars() {
+    [moveBar, deleteBar].forEach(function (b) {
+      if (b && b.parentNode) {
+        b.parentNode.removeChild(b);
+      }
+    });
+    moveBar = null;
+    deleteBar = null;
   }
 
-  function cancelMove() {
+  function cancelAction() {
     if (pending) {
       pending.classList.remove('customize-pending');
     }
     pending = null;
-    removeSticky();
+    removeBars();
+  }
+
+  // Capture the dragged module and drop the bar that was not used, keeping the chosen one.
+  function beginConfirm(keep) {
+    pending = draggedModule;
+    pending.classList.add('customize-pending');
+
+    var drop = (keep === 'move') ? deleteBar : moveBar;
+    if (drop && drop.parentNode) {
+      drop.parentNode.removeChild(drop);
+    }
+    if (keep === 'move') {
+      deleteBar = null;
+    } else {
+      moveBar = null;
+    }
   }
 
   function openSelector(doc) {
-    sticky.textContent = t('JGLOBAL_LOADING', 'Loading…');
+    var bar = moveBar;
+    bar.textContent = t('JGLOBAL_LOADING', 'Loading…');
 
     JC.callAction('position', 'positions', {}).then(function (res) {
       if (!res || !res.success) {
         JC.ui.toast(doc, t('PLG_CUSTOMIZE_POSITION_LOAD_FAILED', 'Could not load positions.'));
-        cancelMove();
+        cancelAction();
         return;
       }
 
-      sticky.textContent = '';
-      sticky.classList.add('customize-sticky-form');
+      bar.textContent = '';
+      bar.classList.add('customize-sticky-form');
 
       var label = doc.createElement('span');
       label.textContent = t('PLG_CUSTOMIZE_POSITION_LABEL', 'Position');
@@ -121,12 +145,12 @@
       cancel.className = 'customize-action customize-action-cancel';
       cancel.textContent = t('COM_MENUS_CUSTOMIZE_CANCEL', 'Cancel');
 
-      sticky.appendChild(label);
-      sticky.appendChild(sel);
-      sticky.appendChild(save);
-      sticky.appendChild(cancel);
+      bar.appendChild(label);
+      bar.appendChild(sel);
+      bar.appendChild(save);
+      bar.appendChild(cancel);
 
-      cancel.addEventListener('click', cancelMove);
+      cancel.addEventListener('click', cancelAction);
 
       save.addEventListener('click', function () {
         save.disabled = true;
@@ -134,9 +158,8 @@
 
         JC.callAction('position', 'move', { id: pending.getAttribute('data-customize-id'), position: sel.value }).then(function (r) {
           if (r && r.success) {
-            // A fresh render shows the module in its new position (revealing it if it was hidden).
             pending = null;
-            sticky = null;
+            moveBar = null;
             reloadFrame();
           } else {
             save.disabled = false;
@@ -153,57 +176,292 @@
     });
   }
 
-  function createSticky(doc) {
-    if (sticky) {
-      return;
-    }
+  function openDeleteConfirm(doc) {
+    var bar = deleteBar;
+    bar.textContent = '';
+    bar.classList.add('customize-sticky-form');
 
-    sticky = doc.createElement('div');
-    sticky.className = 'customize-sticky-zone';
-    sticky.textContent = t('PLG_CUSTOMIZE_POSITION_DROP_HINT', 'Drop here to move to another position');
+    var name = pending.getAttribute('data-customize-name') || '';
+    var label = doc.createElement('span');
+    label.textContent = t('PLG_CUSTOMIZE_POSITION_DELETE_CONFIRM', 'Remove module %s?').replace('%s', name);
 
-    sticky.addEventListener('dragover', function (e) {
+    var del = doc.createElement('button');
+    del.type = 'button';
+    del.className = 'customize-action customize-action-danger';
+    del.textContent = t('PLG_CUSTOMIZE_POSITION_DELETE_BTN', 'Remove');
+
+    var cancel = doc.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'customize-action customize-action-cancel';
+    cancel.textContent = t('COM_MENUS_CUSTOMIZE_CANCEL', 'Cancel');
+
+    bar.appendChild(label);
+    bar.appendChild(del);
+    bar.appendChild(cancel);
+
+    cancel.addEventListener('click', cancelAction);
+
+    del.addEventListener('click', function () {
+      del.disabled = true;
+      del.textContent = t('COM_MENUS_CUSTOMIZE_SAVING', 'Saving…');
+
+      JC.callAction('position', 'delete', { id: pending.getAttribute('data-customize-id') }).then(function (r) {
+        if (r && r.success) {
+          pending = null;
+          deleteBar = null;
+          reloadFrame();
+        } else {
+          del.disabled = false;
+          del.textContent = t('PLG_CUSTOMIZE_POSITION_DELETE_BTN', 'Remove');
+          JC.ui.toast(doc, t('PLG_CUSTOMIZE_POSITION_DELETE_FAILED', 'Could not remove the module.'));
+        }
+      }).catch(function () {
+        del.disabled = false;
+        del.textContent = t('PLG_CUSTOMIZE_POSITION_DELETE_BTN', 'Remove');
+        JC.ui.toast(doc, t('PLG_CUSTOMIZE_POSITION_DELETE_FAILED', 'Could not remove the module.'));
+      });
+    });
+  }
+
+  function makeZone(doc, extraClass, hintKey, hintFallback, onDrop) {
+    var zone = doc.createElement('div');
+    zone.className = 'customize-sticky-zone' + (extraClass ? ' ' + extraClass : '');
+    zone.textContent = t(hintKey, hintFallback);
+
+    zone.addEventListener('dragover', function (e) {
       if (draggedModule) {
         e.preventDefault();
-        sticky.classList.add('customize-sticky-over');
+        zone.classList.add('customize-sticky-over');
       }
     });
 
-    sticky.addEventListener('dragleave', function () {
-      sticky.classList.remove('customize-sticky-over');
+    zone.addEventListener('dragleave', function () {
+      zone.classList.remove('customize-sticky-over');
     });
 
-    sticky.addEventListener('drop', function (e) {
+    zone.addEventListener('drop', function (e) {
       if (!draggedModule) {
         return;
       }
 
       e.preventDefault();
-      sticky.classList.remove('customize-sticky-over');
-      pending = draggedModule;
-      pending.classList.add('customize-pending');
-      openSelector(doc);
+      zone.classList.remove('customize-sticky-over');
+      onDrop(doc);
     });
 
-    doc.body.appendChild(sticky);
+    doc.body.appendChild(zone);
+    return zone;
+  }
+
+  function createBars(doc) {
+    if (moveBar || deleteBar) {
+      return;
+    }
+
+    deleteBar = makeZone(doc, 'customize-sticky-zone-top customize-sticky-danger', 'PLG_CUSTOMIZE_POSITION_DELETE_HINT', 'Drop here to remove this module', function (d) {
+      beginConfirm('delete');
+      openDeleteConfirm(d);
+    });
+
+    moveBar = makeZone(doc, '', 'PLG_CUSTOMIZE_POSITION_DROP_HINT', 'Drop here to move to another position', function (d) {
+      beginConfirm('move');
+      openSelector(d);
+    });
   }
 
   JC.on('customize:drag-start', function (e) {
     draggedModule = (e.detail && e.detail.el) || null;
 
+    if (draggedModule) {
+      draggedModule.classList.remove('customize-new');
+    }
+
     if (isModuleEl(draggedModule) && e.detail && e.detail.doc) {
-      createSticky(e.detail.doc);
+      createBars(e.detail.doc);
     }
   });
 
   JC.on('customize:drag-end', function () {
     draggedModule = null;
 
-    // Keep the bar only if the module was dropped on it (a position is being chosen).
+    // Keep the bars only if the module was dropped on one (a confirm step is showing).
     if (!pending) {
-      removeSticky();
+      removeBars();
     }
   });
+
+  // --- Add module (panel control, in the admin parent) ------------------------
+  // Pick a type + title; the module is created in a default position and shown highlighted and
+  // draggable, so the position is chosen by dragging it (like any other module).
+
+  var newModuleId = null;
+
+  function openAddForm(doc, panel, btn) {
+    btn.classList.add('customize-hidden');
+
+    var form = doc.createElement('div');
+    form.className = 'customize-add-form';
+
+    // Draggable bar at the top: grab it and drop it on the page to place (and create) the module.
+    var bar = doc.createElement('div');
+    bar.className = 'customize-add-bar';
+    bar.setAttribute('draggable', 'true');
+
+    var typeLabel = doc.createElement('label');
+    typeLabel.textContent = t('PLG_CUSTOMIZE_POSITION_ADD_TYPE', 'Module type');
+    var typeSel = doc.createElement('select');
+    typeSel.className = 'form-select form-select-sm';
+
+    var titleLabel = doc.createElement('label');
+    titleLabel.textContent = t('PLG_CUSTOMIZE_POSITION_ADD_TITLE', 'Title');
+    var titleInput = doc.createElement('input');
+    titleInput.type = 'text';
+    titleInput.className = 'form-control form-control-sm';
+
+    var hint = doc.createElement('div');
+    hint.className = 'customize-add-hint';
+    hint.textContent = t('PLG_CUSTOMIZE_POSITION_ADD_HINT', 'Set a type and title, then drag the bar onto the page.');
+
+    var msg = doc.createElement('div');
+    msg.className = 'customize-status is-warn customize-hidden';
+
+    var cancel = doc.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'btn btn-secondary btn-sm';
+    cancel.textContent = t('COM_MENUS_CUSTOMIZE_CANCEL', 'Cancel');
+
+    form.appendChild(bar);
+    form.appendChild(typeLabel);
+    form.appendChild(typeSel);
+    form.appendChild(titleLabel);
+    form.appendChild(titleInput);
+    form.appendChild(hint);
+    form.appendChild(msg);
+    form.appendChild(cancel);
+    panel.appendChild(form);
+
+    function refreshBar() {
+      var title = titleInput.value.trim();
+      bar.textContent = '☰ ' + (title || t('PLG_CUSTOMIZE_POSITION_ADD_BAR', 'New module'));
+    }
+    refreshBar();
+    titleInput.addEventListener('input', refreshBar);
+
+    JC.callAction('position', 'moduletypes', {}).then(function (res) {
+      (res && res.types || []).forEach(function (tp) {
+        var o = doc.createElement('option');
+        o.value = tp.element;
+        o.textContent = tp.name;
+        typeSel.appendChild(o);
+      });
+    });
+
+    function close() {
+      form.remove();
+      btn.classList.remove('customize-hidden');
+    }
+
+    function fail() {
+      msg.textContent = t('PLG_CUSTOMIZE_POSITION_ADD_FAILED', 'Could not add the module.');
+      msg.classList.remove('customize-hidden');
+    }
+
+    cancel.addEventListener('click', close);
+
+    bar.addEventListener('dragstart', function (e) {
+      var title = titleInput.value.trim();
+
+      if (!title || !typeSel.value) {
+        e.preventDefault();
+        msg.textContent = t('PLG_CUSTOMIZE_POSITION_ADD_NEEDINFO', 'Choose a type and enter a title first.');
+        msg.classList.remove('customize-hidden');
+        return;
+      }
+
+      msg.classList.add('customize-hidden');
+
+      try {
+        e.dataTransfer.effectAllowed = 'copy';
+        e.dataTransfer.setData('text/plain', title);
+      } catch (err) {
+        // some browsers restrict dataTransfer
+      }
+
+      bar.classList.add('is-dragging');
+
+      JC.beginExternalDrag('module', { module: typeSel.value, title: title }, function (info) {
+        var position = info.target.getAttribute('data-customize-position') || info.target.getAttribute('data-customize-droppos');
+
+        if (!position) {
+          return;
+        }
+
+        JC.callAction('position', 'add', { title: info.payload.title, module: info.payload.module, position: position }).then(function (res) {
+          if (res && res.success) {
+            newModuleId = res.id;
+            close();
+            reloadFrame();
+          } else {
+            fail();
+          }
+        }).catch(fail);
+      });
+    });
+
+    bar.addEventListener('dragend', function () {
+      bar.classList.remove('is-dragging');
+      JC.endExternalDrag();
+    });
+
+    titleInput.focus();
+  }
+
+  // After the iframe reloads, highlight the freshly created module and pop its toolbar so it can
+  // be grabbed and dragged into place.
+  JC.on('customize:frame-ready', function (e) {
+    var doc = e.detail && e.detail.doc;
+
+    if (!doc || !newModuleId) {
+      return;
+    }
+
+    var m = doc.querySelector('[data-customize-type="module"][data-customize-id="' + newModuleId + '"]');
+    newModuleId = null;
+
+    if (!m) {
+      return;
+    }
+
+    m.classList.add('customize-new');
+
+    try {
+      m.scrollIntoView({ block: 'center' });
+      m.dispatchEvent(new doc.defaultView.MouseEvent('mouseover', { bubbles: true }));
+    } catch (err) {
+      // non-fatal
+    }
+  });
+
+  function buildAddModule() {
+    var panel = JC.panel && JC.panel();
+
+    if (!panel) {
+      return;
+    }
+
+    var doc = window.document;
+    var btn = doc.createElement('button');
+    btn.type = 'button';
+    btn.className = 'customize-add-module btn btn-primary btn-sm';
+    btn.textContent = t('PLG_CUSTOMIZE_POSITION_ADD_BTN', 'Add module');
+    panel.appendChild(btn);
+
+    btn.addEventListener('click', function () {
+      openAddForm(doc, panel, btn);
+    });
+  }
+
+  buildAddModule();
 
   // Declare modules sortable; the engine handles the drag mechanics and calls onReorder on drop
   // onto another module or an empty-position drop zone.

@@ -15,6 +15,7 @@ use Joomla\CMS\Factory;
 use Joomla\CMS\Language\Text;
 use Joomla\CMS\Plugin\CMSPlugin;
 use Joomla\CMS\Session\Session;
+use Joomla\CMS\Table\Table;
 use Joomla\Component\Templates\Administrator\Helper\TemplatesHelper;
 use Joomla\Database\DatabaseInterface;
 use Joomla\Database\ParameterType;
@@ -85,6 +86,18 @@ final class Position extends CMSPlugin implements SubscriberInterface
 
             case 'move':
                 $event->addResult($this->doMove($payload));
+                break;
+
+            case 'moduletypes':
+                $event->addResult($this->doModuleTypes());
+                break;
+
+            case 'add':
+                $event->addResult($this->doAdd($payload));
+                break;
+
+            case 'delete':
+                $event->addResult($this->doDelete($payload));
                 break;
 
             default:
@@ -178,6 +191,159 @@ final class Position extends CMSPlugin implements SubscriberInterface
     }
 
     /**
+     * Delete a module (and its menu assignments).
+     *
+     * @param   array  $payload  The request payload.
+     *
+     * @return  string  JSON result.
+     *
+     * @since   1.0.0
+     */
+    private function doDelete(array $payload): string
+    {
+        $id = (int) ($payload['id'] ?? 0);
+
+        if ($id <= 0 || !$this->getApplication()->getIdentity()->authorise('core.delete', 'com_modules.module.' . $id)) {
+            return $this->fail(Text::_('PLG_CUSTOMIZE_POSITION_ERROR_INVALID'));
+        }
+
+        $table = Table::getInstance('Module', '\\Joomla\\CMS\\Table\\');
+
+        if (!$table || !$table->delete($id)) {
+            return $this->fail(($table ? $table->getError() : '') ?: Text::_('PLG_CUSTOMIZE_POSITION_DELETE_FAILED'));
+        }
+
+        $db    = Factory::getContainer()->get(DatabaseInterface::class);
+        $query = $db->createQuery()
+            ->delete($db->quoteName('#__modules_menu'))
+            ->where($db->quoteName('moduleid') . ' = :id')
+            ->bind(':id', $id, ParameterType::INTEGER);
+        $db->setQuery($query)->execute();
+
+        return json_encode(['success' => true]);
+    }
+
+    /**
+     * Return the installed, enabled site module types (for the "Add module" picker).
+     *
+     * @return  string  JSON result.
+     *
+     * @since   1.0.0
+     */
+    private function doModuleTypes(): string
+    {
+        $db = Factory::getContainer()->get(DatabaseInterface::class);
+
+        $query = $db->createQuery()
+            ->select([$db->quoteName('element'), $db->quoteName('name')])
+            ->from($db->quoteName('#__extensions'))
+            ->where($db->quoteName('type') . ' = ' . $db->quote('module'))
+            ->where($db->quoteName('client_id') . ' = 0')
+            ->where($db->quoteName('enabled') . ' = 1')
+            ->order($db->quoteName('element'));
+        $db->setQuery($query);
+        $rows = $db->loadObjectList() ?: [];
+
+        // Translate each module's display name the way the module manager does.
+        $lang  = $this->getApplication()->getLanguage();
+        $types = [];
+
+        foreach ($rows as $row) {
+            $lang->load($row->element . '.sys', JPATH_SITE)
+                || $lang->load($row->element . '.sys', JPATH_SITE . '/modules/' . $row->element);
+            $types[] = ['element' => $row->element, 'name' => Text::_($row->name)];
+        }
+
+        usort($types, static function ($a, $b) {
+            return strcmp($a['name'], $b['name']);
+        });
+
+        return json_encode(['success' => true, 'types' => $types]);
+    }
+
+    /**
+     * Create a published module of the given type in a position, assigned to all pages.
+     *
+     * @param   array  $payload  The request payload.
+     *
+     * @return  string  JSON result.
+     *
+     * @since   1.0.0
+     */
+    private function doAdd(array $payload): string
+    {
+        $app      = $this->getApplication();
+        $title    = trim((string) ($payload['title'] ?? ''));
+        $module   = trim((string) ($payload['module'] ?? ''));
+        $position = trim((string) ($payload['position'] ?? ''));
+
+        // The picker no longer chooses a position; place the module in the first template
+        // position so it renders, then it is dragged where it belongs.
+        if ($position === '') {
+            $positions = $this->templatePositions();
+            $position  = $positions[0] ?? '';
+        }
+
+        if ($title === '' || $module === '' || $position === '' || !$app->getIdentity()->authorise('core.create', 'com_modules')) {
+            return $this->fail(Text::_('PLG_CUSTOMIZE_POSITION_ERROR_INVALID'));
+        }
+
+        $db = Factory::getContainer()->get(DatabaseInterface::class);
+
+        // Only allow an installed, enabled site module type.
+        $check = $db->createQuery()
+            ->select('COUNT(*)')
+            ->from($db->quoteName('#__extensions'))
+            ->where($db->quoteName('type') . ' = ' . $db->quote('module'))
+            ->where($db->quoteName('client_id') . ' = 0')
+            ->where($db->quoteName('enabled') . ' = 1')
+            ->where($db->quoteName('element') . ' = :element')
+            ->bind(':element', $module);
+        $db->setQuery($check);
+
+        if (!(int) $db->loadResult()) {
+            return $this->fail(Text::_('PLG_CUSTOMIZE_POSITION_ERROR_INVALID'));
+        }
+
+        $maxQuery = $db->createQuery()
+            ->select('MAX(' . $db->quoteName('ordering') . ')')
+            ->from($db->quoteName('#__modules'))
+            ->where($db->quoteName('position') . ' = :pos')
+            ->bind(':pos', $position);
+        $db->setQuery($maxQuery);
+        $ordering = (int) $db->loadResult() + 1;
+
+        $table = Table::getInstance('Module', '\\Joomla\\CMS\\Table\\');
+
+        if (!$table) {
+            return $this->fail(Text::_('PLG_CUSTOMIZE_POSITION_ADD_FAILED'));
+        }
+
+        $table->title     = $title;
+        $table->module    = $module;
+        $table->position  = $position;
+        $table->ordering  = $ordering;
+        $table->published = 1;
+        $table->access    = 1;
+        $table->showtitle = 1;
+        $table->language  = '*';
+        $table->client_id = 0;
+        $table->params    = '{}';
+        $table->note      = '';
+        $table->content   = '';
+
+        if (!$table->check() || !$table->store()) {
+            return $this->fail($table->getError() ?: Text::_('PLG_CUSTOMIZE_POSITION_ADD_FAILED'));
+        }
+
+        // Assign to all pages (menuid 0). insertObject takes the row by reference.
+        $assignment = (object) ['moduleid' => (int) $table->id, 'menuid' => 0];
+        $db->insertObject('#__modules_menu', $assignment);
+
+        return json_encode(['success' => true, 'id' => (int) $table->id]);
+    }
+
+    /**
      * Return the position list of the default site template.
      *
      * @return  string  JSON result.
@@ -185,6 +351,18 @@ final class Position extends CMSPlugin implements SubscriberInterface
      * @since   1.0.0
      */
     private function doPositions(): string
+    {
+        return json_encode(['success' => true, 'positions' => $this->templatePositions()]);
+    }
+
+    /**
+     * The position list declared by the default site template.
+     *
+     * @return  string[]
+     *
+     * @since   1.0.0
+     */
+    private function templatePositions(): array
     {
         $db = Factory::getContainer()->get(DatabaseInterface::class);
 
@@ -200,7 +378,7 @@ final class Position extends CMSPlugin implements SubscriberInterface
         $positions = array_values(array_unique(array_map('strval', (array) $positions)));
         sort($positions);
 
-        return json_encode(['success' => true, 'positions' => $positions]);
+        return $positions;
     }
 
     /**
@@ -216,6 +394,19 @@ final class Position extends CMSPlugin implements SubscriberInterface
 
         foreach (
             [
+                'PLG_CUSTOMIZE_POSITION_ADDED',
+                'PLG_CUSTOMIZE_POSITION_ADD_BAR',
+                'PLG_CUSTOMIZE_POSITION_ADD_BTN',
+                'PLG_CUSTOMIZE_POSITION_ADD_FAILED',
+                'PLG_CUSTOMIZE_POSITION_ADD_HINT',
+                'PLG_CUSTOMIZE_POSITION_ADD_NEEDINFO',
+                'PLG_CUSTOMIZE_POSITION_ADD_TITLE',
+                'PLG_CUSTOMIZE_POSITION_ADD_TYPE',
+                'PLG_CUSTOMIZE_POSITION_DELETED',
+                'PLG_CUSTOMIZE_POSITION_DELETE_BTN',
+                'PLG_CUSTOMIZE_POSITION_DELETE_CONFIRM',
+                'PLG_CUSTOMIZE_POSITION_DELETE_FAILED',
+                'PLG_CUSTOMIZE_POSITION_DELETE_HINT',
                 'PLG_CUSTOMIZE_POSITION_DROP_HINT',
                 'PLG_CUSTOMIZE_POSITION_LABEL',
                 'PLG_CUSTOMIZE_POSITION_LOAD_FAILED',

@@ -220,10 +220,38 @@
   max-width: 40vw;
 }
 
+/* Red "remove this module" zone, pinned to the top. */
+.customize-sticky-zone-top {
+  top: 0;
+  bottom: auto;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.customize-sticky-danger {
+  background: #dc3545;
+}
+
+.customize-sticky-danger.customize-sticky-over {
+  background: #b02a37;
+}
+
+/* The confirm button sits on the red bar, so invert it: white with red text. */
+.customize-action-danger {
+  background: #fff;
+  color: #dc3545;
+  font-weight: 600;
+}
+
 /* A module greyed out in place while its new position is being chosen. */
 .customize-pending {
   opacity: 0.4;
   outline: 2px dashed #9ec5f0;
+  outline-offset: -2px;
+}
+
+/* A freshly added module, highlighted until it is dragged into place. */
+.customize-new {
+  outline: 2px solid #2a7de1;
   outline-offset: -2px;
 }
 
