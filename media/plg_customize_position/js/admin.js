@@ -58,52 +58,32 @@
     });
   }
 
-  // --- Sticky drop zones while dragging a module ------------------------------
-  // Two bars appear while dragging: a blue "move to another position" bar at the bottom and a red
-  // "remove this module" bar at the top. Dropping the module on either greys it in place and turns
-  // that bar into a confirm step (a position picker, or a delete confirmation).
+  // --- Sticky "move to position" bar while dragging a module ------------------
+  // A blue bar appears at the bottom; dropping the module on it greys it in place and turns the bar
+  // into a position picker. (The red "remove" bar is provided generically by the engine via the
+  // module area's onDelete callback below.)
 
   var draggedModule = null;
   var moveBar = null;
-  var deleteBar = null;
   var pending = null;
 
   function isModuleEl(el) {
     return el && el.getAttribute('data-customize-type') === 'module';
   }
 
-  function removeBars() {
-    [moveBar, deleteBar].forEach(function (b) {
-      if (b && b.parentNode) {
-        b.parentNode.removeChild(b);
-      }
-    });
+  function removeMoveBar() {
+    if (moveBar && moveBar.parentNode) {
+      moveBar.parentNode.removeChild(moveBar);
+    }
     moveBar = null;
-    deleteBar = null;
   }
 
-  function cancelAction() {
+  function cancelMove() {
     if (pending) {
       pending.classList.remove('customize-pending');
     }
     pending = null;
-    removeBars();
-  }
-
-  // Capture the dragged module and drop the bar that was not used, keeping the chosen one.
-  function beginConfirm(keep) {
-    pending = draggedModule;
-    pending.classList.add('customize-pending');
-
-    var drop = (keep === 'move') ? deleteBar : moveBar;
-    if (drop && drop.parentNode) {
-      drop.parentNode.removeChild(drop);
-    }
-    if (keep === 'move') {
-      deleteBar = null;
-    } else {
-      moveBar = null;
-    }
+    removeMoveBar();
   }
 
   function openSelector(doc) {
@@ -113,7 +93,7 @@
     JC.callAction('position', 'positions', {}).then(function (res) {
       if (!res || !res.success) {
         JC.ui.toast(doc, t('PLG_CUSTOMIZE_POSITION_LOAD_FAILED', 'Could not load positions.'));
-        cancelAction();
+        cancelMove();
         return;
       }
 
@@ -150,7 +130,7 @@
       bar.appendChild(save);
       bar.appendChild(cancel);
 
-      cancel.addEventListener('click', cancelAction);
+      cancel.addEventListener('click', cancelMove);
 
       save.addEventListener('click', function () {
         save.disabled = true;
@@ -176,97 +156,39 @@
     });
   }
 
-  function openDeleteConfirm(doc) {
-    var bar = deleteBar;
-    bar.textContent = '';
-    bar.classList.add('customize-sticky-form');
+  function createMoveBar(doc) {
+    if (moveBar) {
+      return;
+    }
 
-    var name = pending.getAttribute('data-customize-name') || '';
-    var label = doc.createElement('span');
-    label.textContent = t('PLG_CUSTOMIZE_POSITION_DELETE_CONFIRM', 'Remove module %s?').replace('%s', name);
+    moveBar = doc.createElement('div');
+    moveBar.className = 'customize-sticky-zone';
+    moveBar.textContent = t('PLG_CUSTOMIZE_POSITION_DROP_HINT', 'Drop here to move to another position');
 
-    var del = doc.createElement('button');
-    del.type = 'button';
-    del.className = 'customize-action customize-action-danger';
-    del.textContent = t('PLG_CUSTOMIZE_POSITION_DELETE_BTN', 'Remove');
-
-    var cancel = doc.createElement('button');
-    cancel.type = 'button';
-    cancel.className = 'customize-action customize-action-cancel';
-    cancel.textContent = t('COM_MENUS_CUSTOMIZE_CANCEL', 'Cancel');
-
-    bar.appendChild(label);
-    bar.appendChild(del);
-    bar.appendChild(cancel);
-
-    cancel.addEventListener('click', cancelAction);
-
-    del.addEventListener('click', function () {
-      del.disabled = true;
-      del.textContent = t('COM_MENUS_CUSTOMIZE_SAVING', 'Saving…');
-
-      JC.callAction('position', 'delete', { id: pending.getAttribute('data-customize-id') }).then(function (r) {
-        if (r && r.success) {
-          pending = null;
-          deleteBar = null;
-          reloadFrame();
-        } else {
-          del.disabled = false;
-          del.textContent = t('PLG_CUSTOMIZE_POSITION_DELETE_BTN', 'Remove');
-          JC.ui.toast(doc, t('PLG_CUSTOMIZE_POSITION_DELETE_FAILED', 'Could not remove the module.'));
-        }
-      }).catch(function () {
-        del.disabled = false;
-        del.textContent = t('PLG_CUSTOMIZE_POSITION_DELETE_BTN', 'Remove');
-        JC.ui.toast(doc, t('PLG_CUSTOMIZE_POSITION_DELETE_FAILED', 'Could not remove the module.'));
-      });
-    });
-  }
-
-  function makeZone(doc, extraClass, hintKey, hintFallback, onDrop) {
-    var zone = doc.createElement('div');
-    zone.className = 'customize-sticky-zone' + (extraClass ? ' ' + extraClass : '');
-    zone.textContent = t(hintKey, hintFallback);
-
-    zone.addEventListener('dragover', function (e) {
+    moveBar.addEventListener('dragover', function (e) {
       if (draggedModule) {
         e.preventDefault();
-        zone.classList.add('customize-sticky-over');
+        moveBar.classList.add('customize-sticky-over');
       }
     });
 
-    zone.addEventListener('dragleave', function () {
-      zone.classList.remove('customize-sticky-over');
+    moveBar.addEventListener('dragleave', function () {
+      moveBar.classList.remove('customize-sticky-over');
     });
 
-    zone.addEventListener('drop', function (e) {
+    moveBar.addEventListener('drop', function (e) {
       if (!draggedModule) {
         return;
       }
 
       e.preventDefault();
-      zone.classList.remove('customize-sticky-over');
-      onDrop(doc);
+      moveBar.classList.remove('customize-sticky-over');
+      pending = draggedModule;
+      pending.classList.add('customize-pending');
+      openSelector(doc);
     });
 
-    doc.body.appendChild(zone);
-    return zone;
-  }
-
-  function createBars(doc) {
-    if (moveBar || deleteBar) {
-      return;
-    }
-
-    deleteBar = makeZone(doc, 'customize-sticky-zone-top customize-sticky-danger', 'PLG_CUSTOMIZE_POSITION_DELETE_HINT', 'Drop here to remove this module', function (d) {
-      beginConfirm('delete');
-      openDeleteConfirm(d);
-    });
-
-    moveBar = makeZone(doc, '', 'PLG_CUSTOMIZE_POSITION_DROP_HINT', 'Drop here to move to another position', function (d) {
-      beginConfirm('move');
-      openSelector(d);
-    });
+    doc.body.appendChild(moveBar);
   }
 
   JC.on('customize:drag-start', function (e) {
@@ -277,16 +199,16 @@
     }
 
     if (isModuleEl(draggedModule) && e.detail && e.detail.doc) {
-      createBars(e.detail.doc);
+      createMoveBar(e.detail.doc);
     }
   });
 
   JC.on('customize:drag-end', function () {
     draggedModule = null;
 
-    // Keep the bars only if the module was dropped on one (a confirm step is showing).
+    // Keep the move bar only if the module was dropped on it (a position is being chosen).
     if (!pending) {
-      removeBars();
+      removeMoveBar();
     }
   });
 
@@ -464,7 +386,7 @@
   buildAddModule();
 
   // Declare modules sortable; the engine handles the drag mechanics and calls onReorder on drop
-  // onto another module or an empty-position drop zone.
+  // onto another module or an empty-position drop zone, and onDelete for the engine's remove bar.
   JC.registerAreaType('module', {
     draggable: true,
     onReorder: function (info) {
@@ -477,6 +399,20 @@
 
       info.dragged.setAttribute('data-customize-position', position);
       saveOrder(info.doc, position);
+    },
+    onDelete: function (info) {
+      return JC.callAction('position', 'delete', { id: info.el.getAttribute('data-customize-id') }).then(function (res) {
+        if (res && res.success) {
+          reloadFrame();
+          return true;
+        }
+
+        JC.ui.toast(info.doc, t('PLG_CUSTOMIZE_POSITION_DELETE_FAILED', 'Could not remove the module.'));
+        return false;
+      }).catch(function () {
+        JC.ui.toast(info.doc, t('PLG_CUSTOMIZE_POSITION_SAVE_ERROR', 'Save error.'));
+        return false;
+      });
     }
   });
 }(window));

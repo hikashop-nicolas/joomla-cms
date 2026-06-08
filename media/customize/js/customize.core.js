@@ -28,6 +28,8 @@
     var dragEl = null;
     var dragType = null;
     var externalDrag = null;
+    var removeBar = null;
+    var pendingDelete = null;
 
     function setStatus(text, ok) {
       if (statusEl) {
@@ -113,6 +115,95 @@
       }
     }
 
+    // A red "remove" bar shown at the top while dragging an area type whose definition provides an
+    // onDelete callback. Dropping the element on it greys the element and shows an inline confirm;
+    // confirming calls onDelete({el, doc}) so the owning plugin can delete it. Shared by modules,
+    // menu items and any future deletable type.
+    function cancelRemove() {
+      if (pendingDelete) {
+        pendingDelete.classList.remove('customize-pending');
+      }
+      pendingDelete = null;
+
+      if (removeBar && removeBar.parentNode) {
+        removeBar.parentNode.removeChild(removeBar);
+      }
+      removeBar = null;
+    }
+
+    function showRemoveConfirm(doc, bar, areaType) {
+      bar.textContent = '';
+      bar.classList.add('customize-sticky-form');
+
+      var name = pendingDelete.getAttribute('data-customize-name') || '';
+      var label = doc.createElement('span');
+      label.textContent = JC.text('COM_MENUS_CUSTOMIZE_REMOVE_CONFIRM', 'Remove %s?').replace('%s', name);
+
+      var del = doc.createElement('button');
+      del.type = 'button';
+      del.className = 'customize-action customize-action-danger';
+      del.textContent = JC.text('COM_MENUS_CUSTOMIZE_REMOVE', 'Remove');
+
+      var cancel = doc.createElement('button');
+      cancel.type = 'button';
+      cancel.className = 'customize-action customize-action-cancel';
+      cancel.textContent = JC.text('COM_MENUS_CUSTOMIZE_CANCEL', 'Cancel');
+
+      bar.appendChild(label);
+      bar.appendChild(del);
+      bar.appendChild(cancel);
+
+      cancel.addEventListener('click', cancelRemove);
+
+      del.addEventListener('click', function () {
+        var target = pendingDelete;
+        del.disabled = true;
+        del.textContent = JC.text('COM_MENUS_CUSTOMIZE_SAVING', 'Saving…');
+
+        Promise.resolve(areaType.onDelete({ el: target, doc: doc })).then(function (ok) {
+          if (ok === false) {
+            del.disabled = false;
+            del.textContent = JC.text('COM_MENUS_CUSTOMIZE_REMOVE', 'Remove');
+          } else {
+            // The plugin reloads the iframe on success; just drop our references.
+            pendingDelete = null;
+            removeBar = null;
+          }
+        });
+      });
+    }
+
+    function makeRemoveBar(doc, areaType) {
+      var bar = doc.createElement('div');
+      bar.className = 'customize-sticky-zone customize-sticky-zone-top customize-sticky-danger';
+      bar.textContent = JC.text('COM_MENUS_CUSTOMIZE_REMOVE_HINT', 'Drop here to remove');
+
+      bar.addEventListener('dragover', function (e) {
+        if (dragEl) {
+          e.preventDefault();
+          bar.classList.add('customize-sticky-over');
+        }
+      });
+
+      bar.addEventListener('dragleave', function () {
+        bar.classList.remove('customize-sticky-over');
+      });
+
+      bar.addEventListener('drop', function (e) {
+        if (!dragEl) {
+          return;
+        }
+        e.preventDefault();
+        bar.classList.remove('customize-sticky-over');
+        pendingDelete = dragEl;
+        pendingDelete.classList.add('customize-pending');
+        showRemoveConfirm(doc, bar, areaType);
+      });
+
+      doc.body.appendChild(bar);
+      return bar;
+    }
+
     function makeDragHandle(handle, el, doc) {
       handle.setAttribute('draggable', 'true');
       handle.classList.add('customize-draggable');
@@ -122,6 +213,12 @@
         dragType = el.getAttribute('data-customize-type');
         el.classList.add('customize-dragging');
         highlightDroppables(doc, dragType, true);
+
+        var def = JC.getAreaType(dragType);
+        if (def && typeof def.onDelete === 'function') {
+          removeBar = makeRemoveBar(doc, def);
+        }
+
         try {
           ev.dataTransfer.effectAllowed = 'move';
           ev.dataTransfer.setData('text/plain', el.getAttribute('data-customize-id') || '');
@@ -137,6 +234,14 @@
         JC.emit('customize:drag-end', { el: el });
         dragEl = null;
         dragType = null;
+
+        // Keep the remove bar only if the element was dropped on it (a confirm is showing).
+        if (!pendingDelete && removeBar) {
+          if (removeBar.parentNode) {
+            removeBar.parentNode.removeChild(removeBar);
+          }
+          removeBar = null;
+        }
       });
     }
 
