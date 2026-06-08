@@ -11,6 +11,7 @@ namespace Joomla\CMS\Document\Renderer\Html;
 
 use Joomla\CMS\Customize\CustomizeMode;
 use Joomla\CMS\Document\DocumentRenderer;
+use Joomla\CMS\Event\GenericEvent;
 use Joomla\CMS\Event\Module;
 use Joomla\CMS\Factory;
 use Joomla\CMS\Helper\ModuleHelper;
@@ -60,6 +61,20 @@ class ModulesRenderer extends DocumentRenderer
                     . ' data-customize-position="' . htmlspecialchars($position, ENT_QUOTES) . '"'
                     . ' data-customize-module="' . htmlspecialchars($mod->module, ENT_QUOTES) . '"'
                     . ' data-customize-name="' . htmlspecialchars($mod->title, ENT_QUOTES) . '"';
+
+                // Let customize-group plugins contribute extra data-customize-* attributes for this
+                // module (e.g. a flag that enables a type-specific button), rather than hardcoding
+                // module types here. Each plugin adds entries to the "attributes" array.
+                $customizeEvent = new GenericEvent('onCustomizeModule', ['subject' => $mod, 'position' => $position, 'attributes' => []]);
+                $app->getDispatcher()->dispatch('onCustomizeModule', $customizeEvent);
+
+                foreach ((array) $customizeEvent->getArgument('attributes', []) as $name => $value) {
+                    $name = preg_replace('/[^a-z0-9\-]/', '', (string) $name);
+
+                    if ($name !== '') {
+                        $attrs .= ' data-customize-' . $name . '="' . htmlspecialchars((string) $value, ENT_QUOTES) . '"';
+                    }
+                }
 
                 $moduleHtml = preg_replace('/^(\s*<[a-zA-Z][^>]*?)(\s*\/?>)/', '$1' . $attrs . '$2', $moduleHtml, 1);
             }

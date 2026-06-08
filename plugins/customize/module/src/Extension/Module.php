@@ -10,10 +10,15 @@
 
 namespace Joomla\Plugin\Customize\Module\Extension;
 
+use Joomla\CMS\Component\ComponentHelper;
+use Joomla\CMS\Event\GenericEvent;
 use Joomla\CMS\Event\Plugin\AjaxEvent;
+use Joomla\CMS\Factory;
 use Joomla\CMS\Language\Text;
 use Joomla\CMS\Plugin\CMSPlugin;
 use Joomla\CMS\Session\Session;
+use Joomla\Database\DatabaseInterface;
+use Joomla\Database\ParameterType;
 use Joomla\Event\SubscriberInterface;
 
 // phpcs:disable PSR1.Files.SideEffects
@@ -49,8 +54,30 @@ final class Module extends CMSPlugin implements SubscriberInterface
     {
         return [
             'onAjaxModule'         => 'onAjaxModule',
+            'onCustomizeModule'    => 'onCustomizeModule',
             'onCustomizeAdminInit' => 'onCustomizeAdminInit',
         ];
+    }
+
+    /**
+     * Declare extra customize attributes for a module being rendered. Custom (mod_custom) modules
+     * get a "custom" flag that surfaces the in-place "Edit content" button.
+     *
+     * @param   GenericEvent  $event  The event (subject = the module, attributes = array to fill).
+     *
+     * @return  void
+     *
+     * @since   1.0.0
+     */
+    public function onCustomizeModule(GenericEvent $event): void
+    {
+        $module = $event->getArgument('subject');
+
+        if (isset($module->module) && $module->module === 'mod_custom') {
+            $attributes           = (array) $event->getArgument('attributes', []);
+            $attributes['custom'] = '1';
+            $event->setArgument('attributes', $attributes);
+        }
     }
 
     /**
@@ -115,6 +142,28 @@ final class Module extends CMSPlugin implements SubscriberInterface
                 $event->addResult(json_encode(['success' => true, 'id' => $id]));
                 break;
 
+            case 'savecontent':
+                // mod_custom HTML body, filtered through the user's Text Filters config.
+                $html = ComponentHelper::filterText((string) ($payload['html'] ?? ''));
+
+                if (\strlen($html) > 65535) {
+                    $event->addResult($this->fail(Text::_('PLG_CUSTOMIZE_MODULE_CONTENT_TOO_LARGE')));
+
+                    return;
+                }
+
+                $db    = Factory::getContainer()->get(DatabaseInterface::class);
+                $query = $db->createQuery()
+                    ->update($db->quoteName('#__modules'))
+                    ->set($db->quoteName('content') . ' = :content')
+                    ->where($db->quoteName('id') . ' = :id')
+                    ->bind(':content', $html)
+                    ->bind(':id', $id, ParameterType::INTEGER);
+                $db->setQuery($query)->execute();
+
+                $event->addResult(json_encode(['success' => true, 'id' => $id, 'html' => $html]));
+                break;
+
             default:
                 $event->addResult($this->fail(Text::_('PLG_CUSTOMIZE_MODULE_ERROR_UNKNOWN_ACTION')));
         }
@@ -134,7 +183,10 @@ final class Module extends CMSPlugin implements SubscriberInterface
         $keys = [
             'PLG_CUSTOMIZE_MODULE_AREA',
             'PLG_CUSTOMIZE_MODULE_BTN_ADVANCED',
+            'PLG_CUSTOMIZE_MODULE_BTN_CONTENT',
             'PLG_CUSTOMIZE_MODULE_BTN_EDIT',
+            'PLG_CUSTOMIZE_MODULE_CONTENT_SAVED',
+            'PLG_CUSTOMIZE_MODULE_CONTENT_TOO_LARGE',
             'PLG_CUSTOMIZE_MODULE_LOAD_FAILED',
             'PLG_CUSTOMIZE_MODULE_PUBLISHED',
             'PLG_CUSTOMIZE_MODULE_SAVED',

@@ -72,7 +72,6 @@ $app->getDispatcher()->dispatch('onCustomizeAdminInit', new GenericEvent('onCust
         <?php endif; ?>
     </div>
     <aside class="customize-panel">
-        <div id="customize-status" class="customize-status"><?php echo Text::_('JGLOBAL_LOADING'); ?></div>
         <?php if ($this->previewUrl) : ?>
             <a class="customize-open-external btn btn-outline-secondary btn-sm"
                 href="<?php echo htmlspecialchars($this->previewUrl, ENT_QUOTES); ?>"

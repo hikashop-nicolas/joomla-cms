@@ -121,11 +121,38 @@
     });
   }
 
+  // Edit a custom (mod_custom) module's HTML body in place with a WYSIWYG editor.
+  function editContent(ctx) {
+    var contentEl = ctx.el.querySelector('.mod-custom');
+
+    if (!contentEl) {
+      JC.ui.toast(ctx.doc, t('PLG_CUSTOMIZE_MODULE_NO_CONTENT', 'No editable content here.'));
+      return;
+    }
+
+    JC.editInline({ doc: ctx.doc, el: contentEl }, {
+      html: contentEl.innerHTML,
+      save: function (content) {
+        return ctx.callAction('module', 'savecontent', { id: ctx.data.id, html: content }).then(function (res) {
+          if (res && res.success) {
+            JC.ui.toast(ctx.doc, t('PLG_CUSTOMIZE_MODULE_CONTENT_SAVED', 'Content saved.'));
+          } else {
+            JC.ui.toast(ctx.doc, failMessage(res));
+          }
+
+          return { success: !!(res && res.success), html: res && res.html };
+        });
+      }
+    });
+  }
+
   function openModuleEditor(ctx) {
     window.open('index.php?option=com_modules&task=module.edit&id=' + encodeURIComponent(ctx.data.id), '_blank', 'noopener');
   }
 
   JC.registerAreaType('module', { label: t('PLG_CUSTOMIZE_MODULE_AREA', 'Module') });
   JC.registerButton('module', { id: 'edit', label: t('PLG_CUSTOMIZE_MODULE_BTN_EDIT', 'Edit'), order: 10, onClick: editModule });
+  // Only shown on custom modules (data-customize-custom emitted by the renderer).
+  JC.registerButton('module', { id: 'content', label: t('PLG_CUSTOMIZE_MODULE_BTN_CONTENT', 'Edit content'), order: 20, requires: 'custom', onClick: editContent });
   JC.registerButton('module', { id: 'advanced', label: t('PLG_CUSTOMIZE_MODULE_BTN_ADVANCED', 'Advanced'), order: 90, onClick: openModuleEditor });
 }(window));
