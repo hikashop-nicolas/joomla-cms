@@ -264,3 +264,13 @@
   color: #2a7de1;
   font: 12px sans-serif;
 }
+
+/* In-place name editing (e.g. a menu item): hide the original, show a real text input. */
+.customize-edit-hidden {
+  display: none !important;
+}
+
+.customize-name-input {
+  max-width: 100%;
+  font: inherit;
+}

@@ -171,7 +171,9 @@
     window.open('index.php?option=com_menus&task=item.edit&id=' + encodeURIComponent(ctx.data.id), '_blank', 'noopener');
   }
 
-  // Rename a menu item in place (edit its link text).
+  // Rename a menu item in place. Uses a real text input (not contenteditable on the menu link), so
+  // the caret and arrow keys behave normally, and stops keydown from reaching the menu's own
+  // keyboard handling.
   function editMenuItemName(ctx) {
     var doc = ctx.doc;
     var li = ctx.el;
@@ -180,40 +182,44 @@
       return;
     }
 
-    var target = li.querySelector('a') || li;
-    var original = target.textContent;
+    var anchor = li.querySelector('a') || li;
+    var original = (anchor.textContent || '').trim();
 
     li.setAttribute('data-customize-editing', '1');
     JC.emit('customize:edit-start');
-    target.setAttribute('contenteditable', 'true');
-    target.classList.add('customize-editing');
-    target.focus();
 
-    function blockNav(e) { e.preventDefault(); }
-    target.addEventListener('click', blockNav);
+    var input = doc.createElement('input');
+    input.type = 'text';
+    input.className = 'customize-name-input';
+    input.value = original;
+
+    anchor.classList.add('customize-edit-hidden');
+    anchor.parentNode.insertBefore(input, anchor.nextSibling);
 
     var bar = JC.ui.makeBar(doc);
-    target.parentNode.insertBefore(bar.el, target.nextSibling);
+    input.parentNode.insertBefore(bar.el, input.nextSibling);
+
+    input.focus();
+    input.select();
 
     function teardown() {
-      target.removeAttribute('contenteditable');
-      target.classList.remove('customize-editing');
-      target.removeEventListener('click', blockNav);
-      target.removeEventListener('keydown', onKey);
-      li.removeAttribute('data-customize-editing');
-      JC.emit('customize:edit-end');
+      anchor.classList.remove('customize-edit-hidden');
+      if (input.parentNode) {
+        input.parentNode.removeChild(input);
+      }
       if (bar.el.parentNode) {
         bar.el.parentNode.removeChild(bar.el);
       }
+      li.removeAttribute('data-customize-editing');
+      JC.emit('customize:edit-end');
     }
 
     function cancel() {
-      target.textContent = original;
       teardown();
     }
 
     function save() {
-      var value = target.textContent.trim();
+      var value = input.value.trim();
 
       if (!value) {
         return;
@@ -223,7 +229,7 @@
 
       ctx.callAction('module', 'savemenuitem', { id: ctx.data.id, title: value }).then(function (res) {
         if (res && res.success) {
-          target.textContent = value;
+          anchor.textContent = value;
           li.setAttribute('data-customize-name', value);
           teardown();
           JC.ui.toast(doc, t('PLG_CUSTOMIZE_MODULE_MENUITEM_SAVED', 'Menu item saved.'));
@@ -237,16 +243,18 @@
       });
     }
 
-    function onKey(e) {
+    input.addEventListener('keydown', function (e) {
+      e.stopPropagation();
+
       if (e.key === 'Enter') {
         e.preventDefault();
         save();
       } else if (e.key === 'Escape') {
+        e.preventDefault();
         cancel();
       }
-    }
+    });
 
-    target.addEventListener('keydown', onKey);
     bar.save.addEventListener('click', save);
     bar.cancel.addEventListener('click', cancel);
   }
