@@ -9,6 +9,7 @@
 
 namespace Joomla\CMS\Language;
 
+use Joomla\CMS\Customize\CustomizeMode;
 use Joomla\CMS\Factory;
 use Joomla\Language\Language as BaseLanguage;
 use Joomla\String\StringHelper;
@@ -255,6 +256,11 @@ class Language extends BaseLanguage
                 }
 
                 $this->used[$key][] = $caller;
+            } elseif (CustomizeMode::isActive()) {
+                // Wrap each translation with its key so the customize editor can offer an in-place
+                // language override. Private-use markers survive JSON/attribute contexts; the editor
+                // strips them. \u{E000}<key>\u{E001}<text>\u{E002}.
+                $string = "\u{E000}" . $key . "\u{E001}" . $string . "\u{E002}";
             }
         } else {
             if ($this->debug) {
