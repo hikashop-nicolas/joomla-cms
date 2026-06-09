@@ -11,6 +11,7 @@
 namespace Joomla\Plugin\Customize\Language\Extension;
 
 use Joomla\CMS\Component\ComponentHelper;
+use Joomla\CMS\Customize\CustomizeMode;
 use Joomla\CMS\Event\Plugin\AjaxEvent;
 use Joomla\CMS\Language\LanguageHelper;
 use Joomla\CMS\Language\Text;
@@ -52,8 +53,46 @@ final class LanguageEditor extends CMSPlugin implements SubscriberInterface
     {
         return [
             'onAjaxLanguage'       => 'onAjaxLanguage',
+            'onAfterRender'        => 'onAfterRender',
             'onCustomizeAdminInit' => 'onCustomizeAdminInit',
         ];
+    }
+
+    /**
+     * On a frontend page in customize mode, append the recorded key => text map as a JSON island so
+     * the editor can map on-page text back to its language key. The rendered page is left untouched.
+     *
+     * @return  void
+     *
+     * @since   1.0.0
+     */
+    public function onAfterRender(): void
+    {
+        if (!CustomizeMode::isActive()) {
+            return;
+        }
+
+        $strings = CustomizeMode::getStrings();
+
+        if (!$strings) {
+            return;
+        }
+
+        $app  = $this->getApplication();
+        $body = $app->getBody();
+
+        if (stripos($body, '</body>') === false) {
+            return;
+        }
+
+        $json = json_encode(
+            $strings,
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+        );
+
+        $script = '<script type="application/json" id="customize-lang-map">' . $json . '</script>';
+
+        $app->setBody(preg_replace('/<\/body>/i', $script . '</body>', $body, 1));
     }
 
     /**

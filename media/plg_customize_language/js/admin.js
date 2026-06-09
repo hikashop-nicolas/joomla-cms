@@ -1,13 +1,13 @@
 /**
  * Customize - Language plugin (admin side).
  *
- * Core Language::_ wraps each translated string with its key in customize mode using private-use
- * markers (U+E000 key U+E001 text U+E002). This turns those markers into editable "lang" areas in
- * the iframe (and strips them from attributes), and saves edits as a Joomla language override.
- * Nested translations (a string composed from other translated strings, e.g. dates) nest markers;
- * only leaf strings are made editable, template strings are unwrapped. A MutationObserver runs the
- * same instrumentation on dynamically inserted content (form validation messages, alerts, AJAX),
- * so those become editable too.
+ * In customize mode core records every key => translated string it produces and appends it to the
+ * page as a JSON island (#customize-lang-map), WITHOUT altering the rendered output. This script
+ * reads that map and wraps matching on-page text nodes as editable "lang" areas; editing saves a
+ * Joomla language override. A MutationObserver does the same for dynamically inserted content.
+ *
+ * Only text that renders as its own node equal to a recorded translation is editable; composed /
+ * sprintf strings (e.g. "Category: X", dates) are intentionally left alone.
  *
  * @copyright   (C) 2026 Open Source Matters, Inc. <https://www.joomla.org>
  * @license     GNU General Public License version 2 or later; see LICENSE.txt
@@ -25,152 +25,141 @@
     return JC.text(key, fallback);
   }
 
-  var START = String.fromCharCode(0xE000);
-  var SEP = String.fromCharCode(0xE001);
-  var END = String.fromCharCode(0xE002);
-  var OPEN_RE = new RegExp(START + '[^' + SEP + ']*' + SEP, 'g');
   var SKIP = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, OPTION: 1, TITLE: 1, NOSCRIPT: 1 };
   var editing = false;
+  var lookup = null;
 
-  // Remove all markers, keeping the text (handles nesting): drop every "START key SEP" and END.
-  function stripMarkers(value) {
-    return value.replace(OPEN_RE, '').split(END).join('');
-  }
+  // Build a trimmed-text => key lookup from the JSON island, skipping sprintf/format templates whose
+  // rendered text differs from the raw translation.
+  function readLookup(doc) {
+    var el = doc.getElementById('customize-lang-map');
 
-  // Parse a marker string into a fragment of (possibly nested) lang spans. Returns the fragment and
-  // whether the markers balanced (every START closed, no orphan END). When a translation contains
-  // HTML, its START and END land in different text nodes, so a single node is unbalanced.
-  function parseInto(doc, text) {
-    var frag = doc.createDocumentFragment();
-    var stack = [frag];
-    var i = 0;
-    var buf = '';
-    var orphan = false;
-
-    function flush() {
-      if (buf) {
-        stack[stack.length - 1].appendChild(doc.createTextNode(buf));
-        buf = '';
-      }
+    if (!el) {
+      return null;
     }
 
-    while (i < text.length) {
-      var c = text.charAt(i);
+    var map;
 
-      if (c === START) {
-        var sep = text.indexOf(SEP, i + 1);
-
-        if (sep === -1) {
-          buf += c;
-          i++;
-          continue;
-        }
-
-        flush();
-        var key = text.slice(i + 1, sep);
-        var span = doc.createElement('span');
-        span.setAttribute('data-customize-type', 'lang');
-        span.setAttribute('data-customize-id', key);
-        span.setAttribute('data-customize-name', key);
-        stack[stack.length - 1].appendChild(span);
-        stack.push(span);
-        i = sep + 1;
-      } else if (c === END) {
-        flush();
-        if (stack.length > 1) {
-          stack.pop();
-        } else {
-          orphan = true;
-        }
-        i++;
-      } else {
-        buf += c;
-        i++;
-      }
+    try {
+      map = JSON.parse(el.textContent);
+    } catch (e) {
+      return null;
     }
 
-    flush();
-    return { frag: frag, balanced: stack.length === 1 && !orphan };
-  }
+    var lk = Object.create(null);
 
-  // A lang span that contains another lang span is a template; unwrap it (keep leaves editable).
-  function unwrapTemplates(frag) {
-    var spans = frag.querySelectorAll('span[data-customize-type="lang"]');
+    Object.keys(map).forEach(function (key) {
+      var text = map[key];
 
-    Array.prototype.forEach.call(spans, function (s) {
-      if (s.querySelector('[data-customize-type="lang"]') && s.parentNode) {
-        while (s.firstChild) {
-          s.parentNode.insertBefore(s.firstChild, s);
-        }
-        s.parentNode.removeChild(s);
+      if (typeof text !== 'string') {
+        return;
+      }
+
+      var trimmed = text.trim();
+
+      if (trimmed === '' || trimmed.indexOf('%') !== -1) {
+        return;
+      }
+
+      if (!(trimmed in lk)) {
+        lk[trimmed] = key;
       }
     });
+
+    return lk;
   }
 
-  function spanify(doc, node) {
-    var result = parseInto(doc, node.nodeValue);
+  // The key for a text node if its trimmed text is a recorded translation and it is editable here.
+  function matchTextNode(node) {
+    if (!lookup) {
+      return null;
+    }
 
-    // Unbalanced markers (a translation split across nodes by embedded HTML) can't map cleanly to one
-    // key, so just clean the text rather than make a misleading partial edit area.
-    if (!result.balanced) {
-      node.nodeValue = stripMarkers(node.nodeValue);
+    var parent = node.parentNode;
 
+    if (!parent || parent.nodeType !== 1 || SKIP[parent.nodeName]) {
+      return null;
+    }
+
+    if (parent.getAttribute('data-customize-type') === 'lang') {
+      return null;
+    }
+
+    var trimmed = node.nodeValue.trim();
+
+    if (trimmed === '') {
+      return null;
+    }
+
+    var key = lookup[trimmed];
+
+    if (!key) {
+      return null;
+    }
+
+    // Avoid false positives where DB text happens to equal a translation: if this text is the label
+    // of an enclosing non-lang area (e.g. a menu item title that reads "Home"), it is that area's
+    // content, not an independent translation, so leave it to that area.
+    var area = parent.closest('[data-customize-type]');
+
+    if (area && area.getAttribute('data-customize-type') !== 'lang'
+      && area.getAttribute('data-customize-name') === trimmed) {
+      return null;
+    }
+
+    return key;
+  }
+
+  // Wrap the trimmed text of a node in an editable lang span, preserving surrounding whitespace.
+  function wrapNode(doc, node, key) {
+    var value = node.nodeValue;
+    var trimmed = value.trim();
+    var start = value.indexOf(trimmed);
+    var frag = doc.createDocumentFragment();
+
+    if (start > 0) {
+      frag.appendChild(doc.createTextNode(value.slice(0, start)));
+    }
+
+    var span = doc.createElement('span');
+    span.setAttribute('data-customize-type', 'lang');
+    span.setAttribute('data-customize-id', key);
+    span.setAttribute('data-customize-name', key);
+    span.textContent = trimmed;
+    frag.appendChild(span);
+
+    var after = value.slice(start + trimmed.length);
+
+    if (after) {
+      frag.appendChild(doc.createTextNode(after));
+    }
+
+    if (node.parentNode) {
+      node.parentNode.replaceChild(frag, node);
+    }
+  }
+
+  function instrument(doc, root) {
+    if (!lookup) {
       return;
     }
 
-    unwrapTemplates(result.frag);
-
-    if (node.parentNode) {
-      node.parentNode.replaceChild(result.frag, node);
-    }
-  }
-
-  // Instrument a subtree (the whole body on load, or a freshly inserted node): strip markers from
-  // attributes, turn marker text into editable spans (strip where a span can't go).
-  function instrument(doc, root) {
     root = root || doc.body;
-
-    var els = root.nodeType === 1 ? [root] : [];
-
-    if (root.querySelectorAll) {
-      els = els.concat(Array.prototype.slice.call(root.querySelectorAll('*')));
-    }
-
-    els.forEach(function (el) {
-      for (var i = 0; i < el.attributes.length; i++) {
-        var attr = el.attributes[i];
-
-        if (attr.value.indexOf(START) !== -1) {
-          el.setAttribute(attr.name, stripMarkers(attr.value));
-        }
-      }
-    });
-
-    if (root === doc.body && doc.title && doc.title.indexOf(START) !== -1) {
-      doc.title = stripMarkers(doc.title);
-    }
-
     var walkRoot = root.nodeType === 1 ? root : doc.body;
     var walker = doc.createTreeWalker(walkRoot, NodeFilter.SHOW_TEXT, null);
     var targets = [];
     var node;
 
     while ((node = walker.nextNode())) {
-      if (node.nodeValue.indexOf(START) === -1 && node.nodeValue.indexOf(END) === -1) {
-        continue;
-      }
+      var key = matchTextNode(node);
 
-      var parent = node.parentNode;
-
-      if (parent && SKIP[parent.nodeName]) {
-        node.nodeValue = stripMarkers(node.nodeValue);
-      } else {
-        targets.push(node);
+      if (key) {
+        targets.push({ node: node, key: key });
       }
     }
 
-    targets.forEach(function (n) {
-      spanify(doc, n);
+    targets.forEach(function (it) {
+      wrapNode(doc, it.node, it.key);
     });
   }
 
@@ -190,17 +179,12 @@
       mutations.forEach(function (m) {
         Array.prototype.forEach.call(m.addedNodes, function (n) {
           if (n.nodeType === 3) {
-            if (n.nodeValue.indexOf(START) === -1 && n.nodeValue.indexOf(END) === -1) {
-              return;
-            }
+            var key = matchTextNode(n);
 
-            if (n.parentNode && SKIP[n.parentNode.nodeName]) {
-              n.nodeValue = stripMarkers(n.nodeValue);
-            } else {
-              spanify(doc, n);
+            if (key) {
+              wrapNode(doc, n, key);
             }
-          } else if (n.nodeType === 1 && n.textContent
-            && (n.textContent.indexOf(START) !== -1 || n.textContent.indexOf(END) !== -1)) {
+          } else if (n.nodeType === 1) {
             instrument(doc, n);
           }
         });
@@ -303,10 +287,19 @@
   }
 
   JC.on('customize:frame-ready', function (e) {
-    if (e.detail && e.detail.doc) {
-      instrument(e.detail.doc);
-      observe(e.detail.doc);
+    if (!e.detail || !e.detail.doc) {
+      return;
     }
+
+    var doc = e.detail.doc;
+    lookup = readLookup(doc);
+
+    // Defer until after the other plugins' frame-ready listeners have tagged their areas (modules,
+    // menu items, ...), so the "is this an area's own label?" guard can see them.
+    doc.defaultView.setTimeout(function () {
+      instrument(doc);
+      observe(doc);
+    }, 0);
   });
 
   JC.registerAreaType('lang', { label: t('PLG_CUSTOMIZE_LANGUAGE_AREA', 'Text') });

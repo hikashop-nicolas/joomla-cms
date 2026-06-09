@@ -39,6 +39,14 @@ final class CustomizeMode
     private static $active = false;
 
     /**
+     * Map of language key => translated string used during this request (customize mode only).
+     *
+     * @var    array<string, string>
+     * @since  __DEPLOY_VERSION__
+     */
+    private static $strings = [];
+
+    /**
      * Resolve the customize state for the current request from the URL flag.
      *
      * @param   CMSApplicationInterface  $app  The current application.
@@ -62,5 +70,35 @@ final class CustomizeMode
     public static function isActive(): bool
     {
         return self::$active;
+    }
+
+    /**
+     * Record a key => translated string pair, so the customize editor can map on-page text back to
+     * its language key without altering the rendered output.
+     *
+     * @param   string  $key   The (upper-cased) language key.
+     * @param   string  $text  The translated string.
+     *
+     * @return  void
+     *
+     * @since   __DEPLOY_VERSION__
+     */
+    public static function recordString(string $key, string $text): void
+    {
+        if (!isset(self::$strings[$key])) {
+            self::$strings[$key] = $text;
+        }
+    }
+
+    /**
+     * Get the recorded key => translated string map.
+     *
+     * @return  array<string, string>
+     *
+     * @since   __DEPLOY_VERSION__
+     */
+    public static function getStrings(): array
+    {
+        return self::$strings;
     }
 }
