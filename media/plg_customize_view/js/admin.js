@@ -82,6 +82,7 @@
     target.setAttribute('data-customize-layout', meta.layout || '');
     target.setAttribute('data-customize-block', meta.block || '');
     target.setAttribute('data-customize-occ', meta.occ || '');
+    target.setAttribute('data-customize-template', meta.template || '');
     target.setAttribute('data-customize-name', meta.block || meta.view || 'block');
 
     if (startC.parentNode) {
@@ -140,7 +141,8 @@
       component: ctx.data.component,
       view: ctx.data.view,
       layout: ctx.data.layout,
-      block: ctx.data.block
+      block: ctx.data.block,
+      template: ctx.data.template
     }).then(function (res) {
       if (res && res.success && res.url) {
         window.open(res.url, '_blank', 'noopener');

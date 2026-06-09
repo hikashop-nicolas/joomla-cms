@@ -91,10 +91,14 @@ final class View extends CMSPlugin implements SubscriberInterface
         $key       = $component . '|' . $view . '|' . $layout . '|' . $block;
         $occ       = $this->occurrences[$key] = ($this->occurrences[$key] ?? 0) + 1;
 
+        // Capture the template actually rendering THIS page (here on the frontend getTemplate() is
+        // correct) so the editor writes the override to the right template, not just the default one.
+        $template = (string) $this->getApplication()->getTemplate();
+
         // Values are already sanitised by core (component = option cmd; view/layout/block cleaned in
-        // HtmlView), so they cannot contain ';' or '-->'.
+        // HtmlView; template is a folder element), so they cannot contain ';' or '-->'.
         $meta = 'component=' . $component . ';view=' . $view . ';layout=' . $layout
-            . ';block=' . $block . ';occ=' . $occ;
+            . ';block=' . $block . ';occ=' . $occ . ';template=' . $template;
 
         $event->setArgument('output', '<!--customize-block-start:' . $meta . '-->' . $output . '<!--customize-block-end-->');
     }
@@ -163,9 +167,9 @@ final class View extends CMSPlugin implements SubscriberInterface
             return $this->fail(Text::_('PLG_CUSTOMIZE_VIEW_NO_SOURCE'));
         }
 
-        // This runs in the admin com_ajax context, so resolve the default SITE template explicitly
-        // (not $app->getTemplate(), which would return the administrator template here).
-        $template = $this->siteTemplate();
+        // Use the template that actually rendered the customized page (captured on the frontend and
+        // sent by the client); templateExtensionId() below validates it is a real site template.
+        $template = preg_replace('/[^a-zA-Z0-9_\-]/', '', (string) ($payload['template'] ?? ''));
         $extId    = $this->templateExtensionId($template);
 
         if (!$extId) {
@@ -192,26 +196,6 @@ final class View extends CMSPlugin implements SubscriberInterface
             . '&file=' . $fileParam . '&isMedia=0';
 
         return json_encode(['success' => true, 'url' => $url]);
-    }
-
-    /**
-     * The element of the default site template.
-     *
-     * @return  string
-     *
-     * @since   1.0.0
-     */
-    private function siteTemplate(): string
-    {
-        $db    = Factory::getContainer()->get(DatabaseInterface::class);
-        $query = $db->createQuery()
-            ->select($db->quoteName('template'))
-            ->from($db->quoteName('#__template_styles'))
-            ->where($db->quoteName('client_id') . ' = 0')
-            ->where($db->quoteName('home') . ' = ' . $db->quote('1'));
-        $db->setQuery($query);
-
-        return (string) $db->loadResult();
     }
 
     /**
