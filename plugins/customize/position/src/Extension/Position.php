@@ -10,6 +10,7 @@
 
 namespace Joomla\Plugin\Customize\Position\Extension;
 
+use Joomla\CMS\Event\GenericEvent;
 use Joomla\CMS\Event\Plugin\AjaxEvent;
 use Joomla\CMS\Factory;
 use Joomla\CMS\Language\Text;
@@ -51,9 +52,32 @@ final class Position extends CMSPlugin implements SubscriberInterface
     public static function getSubscribedEvents(): array
     {
         return [
-            'onAjaxPosition'       => 'onAjaxPosition',
-            'onCustomizeAdminInit' => 'onCustomizeAdminInit',
+            'onAjaxPosition'           => 'onAjaxPosition',
+            'onCustomizeEmptyPosition' => 'onCustomizeEmptyPosition',
+            'onCustomizeAdminInit'     => 'onCustomizeAdminInit',
         ];
+    }
+
+    /**
+     * Emit a drop zone for an empty template position (so a module can be dragged into it), keeping
+     * this markup in the plugin rather than in core's ModulesRenderer.
+     *
+     * @param   GenericEvent  $event  The event (subject = position name, content = markup to fill).
+     *
+     * @return  void
+     *
+     * @since   1.0.0
+     */
+    public function onCustomizeEmptyPosition(GenericEvent $event): void
+    {
+        $position = (string) $event->getArgument('subject', '');
+
+        $event->setArgument(
+            'content',
+            '<div class="customize-empty-position" data-customize-dropzone="module" data-customize-droppos="'
+            . htmlspecialchars($position, ENT_QUOTES) . '">'
+            . htmlspecialchars($position) . '</div>'
+        );
     }
 
     /**

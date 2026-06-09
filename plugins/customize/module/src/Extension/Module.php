@@ -149,10 +149,11 @@ final class Module extends CMSPlugin implements SubscriberInterface
     }
 
     /**
-     * Declare extra customize attributes for a module being rendered. Custom (mod_custom) modules
-     * get a "custom" flag that surfaces the in-place "Edit content" button.
+     * Instrument a module being rendered in customize mode: inject the data-customize-* attributes
+     * into its first tag (so core carries no customize markup). Custom (mod_custom) modules also get
+     * a "custom" flag that surfaces the in-place "Edit content" button.
      *
-     * @param   GenericEvent  $event  The event (subject = the module, attributes = array to fill).
+     * @param   GenericEvent  $event  The event (subject = module, position, output = module HTML).
      *
      * @return  void
      *
@@ -160,13 +161,27 @@ final class Module extends CMSPlugin implements SubscriberInterface
      */
     public function onCustomizeModule(GenericEvent $event): void
     {
-        $module = $event->getArgument('subject');
+        $html = $event->getArgument('output');
+
+        if (!\is_string($html) || trim($html) === '') {
+            return;
+        }
+
+        $module   = $event->getArgument('subject');
+        $position = (string) $event->getArgument('position', '');
+
+        $attrs = ' data-customize-type="module"'
+            . ' data-customize-id="' . (int) ($module->id ?? 0) . '"'
+            . ' data-customize-position="' . htmlspecialchars($position, ENT_QUOTES) . '"'
+            . ' data-customize-module="' . htmlspecialchars((string) ($module->module ?? ''), ENT_QUOTES) . '"'
+            . ' data-customize-name="' . htmlspecialchars((string) ($module->title ?? ''), ENT_QUOTES) . '"';
 
         if (isset($module->module) && $module->module === 'mod_custom') {
-            $attributes           = (array) $event->getArgument('attributes', []);
-            $attributes['custom'] = '1';
-            $event->setArgument('attributes', $attributes);
+            $attrs .= ' data-customize-custom="1"';
         }
+
+        // Inject into the module's first tag (no extra wrapper).
+        $event->setArgument('output', preg_replace('/^(\s*<[a-zA-Z][^>]*?)(\s*\/?>)/', '$1' . $attrs . '$2', $html, 1));
     }
 
     /**

@@ -54,29 +54,16 @@ class ModulesRenderer extends DocumentRenderer
         foreach (ModuleHelper::getModules($position) as $mod) {
             $moduleHtml = $renderer->render($mod, $params, $content);
 
-            // In customize mode, mark each module's first tag so the editor can target it (no extra wrapper).
+            // In customize mode, let the customize "module" plugin instrument this module's output.
+            // Core only fires the hook and uses the returned string; it holds no customize markup.
             if ($customize && trim($moduleHtml) !== '') {
-                $attrs = ' data-customize-type="module"'
-                    . ' data-customize-id="' . (int) $mod->id . '"'
-                    . ' data-customize-position="' . htmlspecialchars($position, ENT_QUOTES) . '"'
-                    . ' data-customize-module="' . htmlspecialchars($mod->module, ENT_QUOTES) . '"'
-                    . ' data-customize-name="' . htmlspecialchars($mod->title, ENT_QUOTES) . '"';
-
-                // Let customize-group plugins contribute extra data-customize-* attributes for this
-                // module (e.g. a flag that enables a type-specific button), rather than hardcoding
-                // module types here. Each plugin adds entries to the "attributes" array.
-                $customizeEvent = new GenericEvent('onCustomizeModule', ['subject' => $mod, 'position' => $position, 'attributes' => []]);
+                $customizeEvent = new GenericEvent('onCustomizeModule', ['subject' => $mod, 'position' => $position, 'output' => $moduleHtml]);
                 $app->getDispatcher()->dispatch('onCustomizeModule', $customizeEvent);
+                $customized = $customizeEvent->getArgument('output');
 
-                foreach ((array) $customizeEvent->getArgument('attributes', []) as $name => $value) {
-                    $name = preg_replace('/[^a-z0-9\-]/', '', (string) $name);
-
-                    if ($name !== '') {
-                        $attrs .= ' data-customize-' . $name . '="' . htmlspecialchars((string) $value, ENT_QUOTES) . '"';
-                    }
+                if (\is_string($customized)) {
+                    $moduleHtml = $customized;
                 }
-
-                $moduleHtml = preg_replace('/^(\s*<[a-zA-Z][^>]*?)(\s*\/?>)/', '$1' . $attrs . '$2', $moduleHtml, 1);
             }
 
             if ($frontediting && trim($moduleHtml) != '' && $user->authorise('module.edit.frontend', 'com_modules.module.' . $mod->id)) {
@@ -87,11 +74,15 @@ class ModulesRenderer extends DocumentRenderer
             $buffer .= $moduleHtml;
         }
 
-        // In customize mode, a position with no modules still gets a (drag-revealed) drop zone.
+        // In customize mode, let a plugin add a drop zone for an empty position (no markup in core).
         if ($customize && trim($buffer) === '') {
-            $buffer = '<div class="customize-empty-position" data-customize-dropzone="module" data-customize-droppos="'
-                . htmlspecialchars($position, ENT_QUOTES) . '">'
-                . htmlspecialchars($position) . '</div>';
+            $emptyEvent = new GenericEvent('onCustomizeEmptyPosition', ['subject' => $position, 'content' => '']);
+            $app->getDispatcher()->dispatch('onCustomizeEmptyPosition', $emptyEvent);
+            $emptyContent = $emptyEvent->getArgument('content');
+
+            if (\is_string($emptyContent)) {
+                $buffer = $emptyContent;
+            }
         }
 
         // Dispatch onAfterRenderModules event
