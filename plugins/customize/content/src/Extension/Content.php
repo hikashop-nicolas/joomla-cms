@@ -330,7 +330,7 @@ final class Content extends CMSPlugin implements SubscriberInterface
         $url    = (string) ($payload['url'] ?? '');
         $target = (($payload['target'] ?? 'intro') === 'full') ? 'image_fulltext' : 'image_intro';
 
-        $images = \is_array($record->images) ? $record->images : (new Registry($record->images))->toArray();
+        $images          = \is_array($record->images) ? $record->images : (new Registry($record->images))->toArray();
         $images[$target] = $url;
 
         if (!$model->save(['id' => (int) $record->id, 'catid' => (int) $record->catid, 'images' => $images])) {
