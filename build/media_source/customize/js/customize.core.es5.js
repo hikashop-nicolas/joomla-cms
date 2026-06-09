@@ -211,6 +211,40 @@
       return bar;
     }
 
+    // Keyboard equivalent of dragging an element onto the remove bar: show the same inline confirm,
+    // move focus to the Remove button, and let Escape cancel (focus returns to the element).
+    function keyboardDelete(el, doc) {
+      var areaType = JC.getAreaType(el.getAttribute('data-customize-type'));
+
+      if (!areaType || typeof areaType.onDelete !== 'function') {
+        return;
+      }
+
+      cancelRemove();
+      removeBar = makeRemoveBar(doc, areaType);
+      pendingDelete = el;
+      el.classList.add('customize-pending');
+      showRemoveConfirm(doc, removeBar, areaType);
+
+      removeBar.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          var target = pendingDelete;
+          cancelRemove();
+
+          if (target) {
+            target.focus();
+          }
+        }
+      });
+
+      var del = removeBar.querySelector('.customize-action-danger');
+
+      if (del) {
+        del.focus();
+      }
+    }
+
     function makeDragHandle(handle, el, doc) {
       handle.setAttribute('draggable', 'true');
       handle.classList.add('customize-draggable');
@@ -604,6 +638,10 @@
         return !!((JC.getAreaType(el.getAttribute('data-customize-type')) || {}).draggable);
       }
 
+      function isDeletable(el) {
+        return typeof (JC.getAreaType(el.getAttribute('data-customize-type')) || {}).onDelete === 'function';
+      }
+
       function ensureArea(el) {
         if (!el.hasAttribute('tabindex')) {
           el.setAttribute('tabindex', '-1');
@@ -620,8 +658,19 @@
         }
 
         if (!el.getAttribute('aria-keyshortcuts')) {
-          // Draggable areas can also be reordered from the keyboard (the alternative to drag-and-drop).
-          el.setAttribute('aria-keyshortcuts', isDraggable(el) ? 'Enter Control+ArrowUp Control+ArrowDown' : 'Enter');
+          // Draggable areas can be reordered/moved and deletable ones removed from the keyboard, as the
+          // alternative to drag-and-drop.
+          var shortcuts = ['Enter'];
+
+          if (isDraggable(el)) {
+            shortcuts.push('Control+ArrowUp', 'Control+ArrowDown', 'Control+ArrowLeft', 'Control+ArrowRight');
+          }
+
+          if (isDeletable(el)) {
+            shortcuts.push('Delete');
+          }
+
+          el.setAttribute('aria-keyshortcuts', shortcuts.join(' '));
         }
 
         if (!el.getAttribute('aria-label')) {
@@ -629,7 +678,7 @@
         }
       }
 
-      // Tell screen readers which area was entered (and how to edit/move it) via the live region.
+      // Tell screen readers which area was entered (and how to edit/move/remove it) via the live region.
       function announce(el) {
         if (!srStatus) {
           return;
@@ -638,7 +687,11 @@
         var msg = describe(el) + '. ' + JC.text('COM_MENUS_CUSTOMIZE_AREA_HINT', 'Press Enter to edit');
 
         if (isDraggable(el)) {
-          msg += '. ' + JC.text('COM_MENUS_CUSTOMIZE_AREA_MOVE_HINT', 'Hold Ctrl and press Up or Down to move');
+          msg += '. ' + JC.text('COM_MENUS_CUSTOMIZE_AREA_MOVE_HINT', 'Use Ctrl with the arrow keys to move it');
+        }
+
+        if (isDeletable(el)) {
+          msg += '. ' + JC.text('COM_MENUS_CUSTOMIZE_AREA_DELETE_HINT', 'Press Delete to remove it');
         }
 
         if (srStatus.textContent !== msg) {
@@ -685,6 +738,80 @@
           var now = peers();
           var tmpl = JC.text('COM_MENUS_CUSTOMIZE_AREA_MOVED', 'Moved to position %1$s of %2$s');
           srStatus.textContent = describe(el) + '. ' + tmpl.replace('%1$s', now.indexOf(el) + 1).replace('%2$s', now.length);
+        }
+      }
+
+      // The template positions present on the page, in document order (modules + empty drop zones).
+      function positionsOnPage() {
+        var seen = {};
+        var list = [];
+
+        Array.prototype.forEach.call(doc.querySelectorAll('[data-customize-position], [data-customize-droppos]'), function (el) {
+          var p = el.getAttribute('data-customize-position') || el.getAttribute('data-customize-droppos');
+
+          if (p && !seen[p]) {
+            seen[p] = true;
+            list.push(p);
+          }
+        });
+
+        return list;
+      }
+
+      // An insertion reference inside a position: its empty drop zone, else its first module.
+      function refInPosition(position) {
+        var dropZone = null;
+        var firstModule = null;
+
+        Array.prototype.forEach.call(doc.querySelectorAll('[data-customize-droppos], [data-customize-type="module"]'), function (el) {
+          if (!dropZone && el.getAttribute('data-customize-droppos') === position) {
+            dropZone = el;
+          } else if (!firstModule && el.getAttribute('data-customize-type') === 'module' && el.getAttribute('data-customize-position') === position) {
+            firstModule = el;
+          }
+        });
+
+        return dropZone || firstModule;
+      }
+
+      // Send a draggable block to the previous/next template position on the page (keyboard equivalent
+      // of dragging it onto another position). Persists via onReorder, the same path as a cross-position
+      // drop.
+      function moveToPosition(el, dir) {
+        var positions = positionsOnPage();
+
+        if (positions.length < 2) {
+          return;
+        }
+
+        var current = el.getAttribute('data-customize-position');
+        var target = positions[(positions.indexOf(current) + dir + positions.length) % positions.length];
+
+        if (!target || target === current) {
+          return;
+        }
+
+        var ref = refInPosition(target);
+
+        if (!ref) {
+          return;
+        }
+
+        ref.parentNode.insertBefore(el, ref);
+        el.setAttribute('data-customize-position', target);
+
+        var type = el.getAttribute('data-customize-type');
+        var def = JC.getAreaType(type);
+
+        if (def && typeof def.onReorder === 'function') {
+          def.onReorder({ dragged: el, target: ref, doc: doc, type: type });
+        }
+
+        el.focus();
+        showFor(el, doc);
+
+        if (srStatus) {
+          srStatus.textContent = describe(el) + '. ' + JC.text('COM_MENUS_CUSTOMIZE_AREA_MOVED_TO', 'Moved to %s').replace('%s', target);
         }
       }
 
@@ -782,13 +909,34 @@
           return;
         }
 
-        // Ctrl+Up/Down reorders a draggable block (the keyboard alternative to drag-and-drop).
+        // Ctrl+Up/Down reorders a draggable block; Ctrl+Left/Right sends it to another position (the
+        // keyboard alternative to drag-and-drop).
         if (event.ctrlKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
           if (isDraggable(el)) {
             event.preventDefault();
             moveBlock(el, event.key === 'ArrowUp' ? -1 : 1);
           }
 
+          return;
+        }
+
+        if (event.ctrlKey && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+          if (isDraggable(el) && el.hasAttribute('data-customize-position')) {
+            event.preventDefault();
+            moveToPosition(el, event.key === 'ArrowLeft' ? -1 : 1);
+          }
+
+          return;
+        }
+
+        if (event.ctrlKey) {
+          return;
+        }
+
+        // Delete removes a deletable block (after the same confirm as the drag remove bar).
+        if (event.key === 'Delete' && isDeletable(el)) {
+          event.preventDefault();
+          keyboardDelete(el, doc);
           return;
         }
 

@@ -63,6 +63,8 @@ Text::script('COM_MENUS_CUSTOMIZE_AREA_ROLEDESCRIPTION');
 Text::script('COM_MENUS_CUSTOMIZE_AREA_HINT');
 Text::script('COM_MENUS_CUSTOMIZE_AREA_MOVE_HINT');
 Text::script('COM_MENUS_CUSTOMIZE_AREA_MOVED');
+Text::script('COM_MENUS_CUSTOMIZE_AREA_MOVED_TO');
+Text::script('COM_MENUS_CUSTOMIZE_AREA_DELETE_HINT');
 
 // Let customize plugins register their own JS strings and admin assets.
 $app = Factory::getApplication();
