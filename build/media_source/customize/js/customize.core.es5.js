@@ -25,6 +25,9 @@
     var toolbar = null;
     var current = null;
     var editing = false;
+    // The element kept selected (outline + toolbar) while the user interacts with it (after a button
+    // click or double-click), so it stays put when the pointer moves away. Cleared by a click outside.
+    var pinned = null;
     var dragEl = null;
     var dragType = null;
     var externalDrag = null;
@@ -385,6 +388,9 @@
               emit: JC.emit
             });
           }
+
+          // Keep this element selected while the user works with it (cleared by a click elsewhere).
+          pinned = el;
         });
         actions.appendChild(btn);
       });
@@ -461,7 +467,8 @@
           return;
         }
 
-        if (editing) {
+        // While editing, or with an element pinned/selected, don't follow the hover elsewhere.
+        if (editing || pinned) {
           return;
         }
 
@@ -478,6 +485,76 @@
         }
       });
 
+      // A click outside the selected element (and its toolbar / editor UI) clears the selection.
+      // Not while an inline editor is open: the user finishes that with Enter/Escape.
+      doc.addEventListener('click', function (event) {
+        if (!pinned || editing) {
+          return;
+        }
+
+        var t = event.target;
+
+        if (pinned.contains(t)
+          || (toolbar && toolbar.contains(t))
+          || (t.closest && t.closest('.customize-popover, .customize-inline-bar, .customize-sticky-zone'))) {
+          return;
+        }
+
+        pinned = null;
+        var el = t.closest ? t.closest('[data-customize-type]') : null;
+
+        if (el) {
+          showFor(el, doc);
+        } else {
+          hide();
+        }
+      });
+
+      // Double-click an element to trigger its primary action (the first applicable button).
+      doc.addEventListener('dblclick', function (event) {
+        if (editing) {
+          return;
+        }
+
+        var el = event.target.closest ? event.target.closest('[data-customize-type]') : null;
+
+        if (!el) {
+          return;
+        }
+
+        var type = el.getAttribute('data-customize-type');
+        var buttons = JC.getButtons(type);
+        var primary = null;
+
+        for (var i = 0; i < buttons.length; i++) {
+          if (!buttons[i].requires || el.hasAttribute('data-customize-' + buttons[i].requires)) {
+            primary = buttons[i];
+            break;
+          }
+        }
+
+        if (!primary || typeof primary.onClick !== 'function') {
+          return;
+        }
+
+        event.preventDefault();
+
+        if (current !== el) {
+          showFor(el, doc);
+        }
+
+        pinned = el;
+        primary.onClick({
+          el: el,
+          doc: doc,
+          type: type,
+          name: el.getAttribute('data-customize-name') || '',
+          data: dataset(el),
+          callAction: JC.callAction,
+          emit: JC.emit
+        });
+      });
+
       JC.emit('customize:frame-ready', { doc: doc, areas: areas.length });
 
       // Wire drag-to-reorder after plugins have tagged their areas/zones.
@@ -488,9 +565,10 @@
       overlay = null;
       toolbar = null;
       current = null;
-      // Any in-progress edit is gone with the old document; clear the flag so hover works again
-      // (e.g. when a plugin reloads the frame to apply a save).
+      // Any in-progress edit/selection is gone with the old document; clear the flags so hover works
+      // again (e.g. when a plugin reloads the frame to apply a save).
       editing = false;
+      pinned = null;
 
       var doc = frameDoc();
 
@@ -511,10 +589,10 @@
       wire(doc);
     });
 
-    // While an inline editor is open, hide the hover outline and suppress re-showing it.
+    // While an inline editor is open, suppress hover-following but keep the element's outline + bar
+    // (it stays selected). The selection is cleared by a click elsewhere.
     JC.on('customize:edit-start', function () {
       editing = true;
-      hide();
     });
 
     JC.on('customize:edit-end', function () {

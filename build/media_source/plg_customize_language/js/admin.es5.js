@@ -431,5 +431,5 @@
   });
 
   JC.registerAreaType('lang', { label: t('PLG_CUSTOMIZE_LANGUAGE_AREA', 'Text') });
-  JC.registerButton('lang', { id: 'edit', label: t('PLG_CUSTOMIZE_LANGUAGE_BTN_EDIT', 'Edit text'), order: 10, onClick: editLang });
+  JC.registerButton('lang', { id: 'edit', label: t('PLG_CUSTOMIZE_LANGUAGE_BTN_EDIT', 'Edit'), order: 10, onClick: editLang });
 }(window));
