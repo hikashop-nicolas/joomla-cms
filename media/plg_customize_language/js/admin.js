@@ -26,6 +26,7 @@
   }
 
   var SKIP = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, OPTION: 1, TITLE: 1, NOSCRIPT: 1 };
+  var PLACEHOLDER = /%(\d+\$)?[sdufeEgGxXobc]|%%/;
   var editing = false;
   var maps = null;
 
@@ -61,7 +62,6 @@
     var prefix = Object.create(null);
     var sprintf = Object.create(null);
     var strings = data.strings || {};
-    var phRe = /%(\d+\$)?[sdufeEgGxXobc]|%%/;
 
     Object.keys(strings).forEach(function (key) {
       var text = strings[key];
@@ -76,7 +76,7 @@
         return;
       }
 
-      if (!phRe.test(text)) {
+      if (!PLACEHOLDER.test(text)) {
         // Simple translation: match the text as-is.
         if (!(trimmed in exact)) {
           exact[trimmed] = key;
@@ -84,7 +84,7 @@
       } else {
         // Format string: match its literal prefix (the text before the first placeholder), e.g. the
         // "Written by: " text node that precedes a <span>author</span>.
-        var at = text.search(phRe);
+        var at = text.search(PLACEHOLDER);
         var pfx = at > 0 ? text.slice(0, at).trim() : '';
 
         if (pfx.length >= 4 && !(pfx in prefix)) {
@@ -364,12 +364,18 @@
     }
 
     function save() {
+      var value = span.textContent;
       JC.ui.saving(bar.save);
 
-      JC.callAction('language', 'save', { key: ctx.data.id, value: span.textContent }).then(function (res) {
+      JC.callAction('language', 'save', { key: ctx.data.id, value: value }).then(function (res) {
         if (res && res.success) {
-          teardown();
-          JC.ui.toast(doc, t('PLG_CUSTOMIZE_LANGUAGE_SAVED', 'Translation saved.'));
+          // If the edit introduced a placeholder, the value is now a format and must be re-rendered.
+          if (PLACEHOLDER.test(value)) {
+            reloadFrame();
+          } else {
+            teardown();
+            JC.ui.toast(doc, t('PLG_CUSTOMIZE_LANGUAGE_SAVED', 'Translation saved.'));
+          }
         } else {
           JC.ui.resetSave(bar.save);
           var reason = (res && res.message) || t('PLG_CUSTOMIZE_LANGUAGE_UNKNOWN_ERROR', 'unknown error');
