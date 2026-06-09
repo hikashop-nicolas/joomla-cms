@@ -21,7 +21,6 @@
       return;
     }
 
-    var overlay = null;
     var toolbar = null;
     var current = null;
     var editing = false;
@@ -63,21 +62,16 @@
     }
 
     function buildChrome(doc) {
-      overlay = doc.createElement('div');
-      overlay.className = 'customize-area-outline';
-      overlay.style.display = 'none';
-
       toolbar = doc.createElement('div');
       toolbar.className = 'customize-toolbar';
       toolbar.style.display = 'none';
 
-      doc.body.appendChild(overlay);
       doc.body.appendChild(toolbar);
     }
 
     function hide() {
+      if (current) { current.classList.remove('customize-area-active'); }
       current = null;
-      if (overlay) { overlay.style.display = 'none'; }
       if (toolbar) { toolbar.style.display = 'none'; }
     }
 
@@ -331,18 +325,25 @@
       });
     }
 
-    function showFor(el, doc) {
-      current = el;
+    // Position the toolbar at the element's top-left. The element's own outline (a CSS class on it)
+    // tracks size changes by itself, so only the floating toolbar needs placing.
+    function positionFor(el, doc) {
       var win = doc.defaultView;
       var rect = el.getBoundingClientRect();
-      var top = rect.top + win.scrollY;
-      var left = rect.left + win.scrollX;
 
-      overlay.style.display = 'block';
-      overlay.style.top = top + 'px';
-      overlay.style.left = left + 'px';
-      overlay.style.width = rect.width + 'px';
-      overlay.style.height = rect.height + 'px';
+      toolbar.style.top = (rect.top + win.scrollY) + 'px';
+      toolbar.style.left = (rect.left + win.scrollX) + 'px';
+    }
+
+    function showFor(el, doc) {
+      // Outline the element via a class on itself; the browser tracks its box, so the outline follows
+      // size changes (e.g. an inline editor growing the element) with no scripting.
+      if (current && current !== el) {
+        current.classList.remove('customize-area-active');
+      }
+
+      current = el;
+      el.classList.add('customize-area-active');
 
       var type = el.getAttribute('data-customize-type');
       var name = el.getAttribute('data-customize-name') || '';
@@ -353,6 +354,17 @@
       var label = doc.createElement('span');
       label.className = 'customize-toolbar-label';
       label.textContent = (areaType.label || type) + (name ? ' · ' + name : '');
+
+      // A plugin can flag an element (e.g. a view block that already has a template override) to show
+      // a small cue after the title.
+      var cue = el.getAttribute('data-customize-cue');
+
+      if (cue) {
+        var cueEl = doc.createElement('span');
+        cueEl.className = 'customize-toolbar-cue';
+        cueEl.textContent = cue;
+        label.appendChild(cueEl);
+      }
 
       // Draggable area types (e.g. modules) use the toolbar title as the drag handle, leaving the
       // element body free for editing its contents. The owning plugin handles the drop and save.
@@ -400,8 +412,7 @@
       toolbar.appendChild(actions);
       toolbar.appendChild(label);
       toolbar.style.display = 'flex';
-      toolbar.style.top = top + 'px';
-      toolbar.style.left = left + 'px';
+      positionFor(el, doc);
     }
 
     // Carry customize=1 across in-iframe navigation (same-origin links and forms), so the mode
@@ -562,7 +573,6 @@
     }
 
     frame.addEventListener('load', function () {
-      overlay = null;
       toolbar = null;
       current = null;
       // Any in-progress edit/selection is gone with the old document; clear the flags so hover works

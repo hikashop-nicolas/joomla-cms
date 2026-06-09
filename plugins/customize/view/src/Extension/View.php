@@ -95,10 +95,15 @@ final class View extends CMSPlugin implements SubscriberInterface
         // correct) so the editor writes the override to the right template, not just the default one.
         $template = (string) $this->getApplication()->getTemplate();
 
+        // Flag whether this block already has a template override, for a cue in the editor toolbar.
+        $fileName     = ($layout !== '' ? $layout . '_' . $block : $block) . '.php';
+        $overrideFile = JPATH_SITE . '/templates/' . $template . '/html/' . $component . '/' . $view . '/' . $fileName;
+        $hasOverride  = ($component !== '' && $view !== '' && is_file($overrideFile)) ? '1' : '0';
+
         // Values are already sanitised by core (component = option cmd; view/layout/block cleaned in
         // HtmlView; template is a folder element), so they cannot contain ';' or '-->'.
         $meta = 'component=' . $component . ';view=' . $view . ';layout=' . $layout
-            . ';block=' . $block . ';occ=' . $occ . ';template=' . $template;
+            . ';block=' . $block . ';occ=' . $occ . ';template=' . $template . ';override=' . $hasOverride;
 
         $event->setArgument('output', '<!--customize-block-start:' . $meta . '-->' . $output . '<!--customize-block-end-->');
     }
@@ -241,6 +246,7 @@ final class View extends CMSPlugin implements SubscriberInterface
             [
                 'PLG_CUSTOMIZE_VIEW_AREA',
                 'PLG_CUSTOMIZE_VIEW_BTN_EDIT',
+                'PLG_CUSTOMIZE_VIEW_OVERRIDDEN',
                 'PLG_CUSTOMIZE_VIEW_SAVED',
                 'PLG_CUSTOMIZE_VIEW_SAVE_ERROR',
                 'PLG_CUSTOMIZE_VIEW_SAVE_FAILED',

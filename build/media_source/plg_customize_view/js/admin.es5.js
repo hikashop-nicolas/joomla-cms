@@ -85,6 +85,10 @@
     target.setAttribute('data-customize-template', meta.template || '');
     target.setAttribute('data-customize-name', meta.block || meta.view || 'block');
 
+    if (meta.override === '1') {
+      target.setAttribute('data-customize-cue', t('PLG_CUSTOMIZE_VIEW_OVERRIDDEN', 'Overridden'));
+    }
+
     if (startC.parentNode) {
       startC.parentNode.removeChild(startC);
     }
