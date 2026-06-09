@@ -1,0 +1,36 @@
+{
+  "$schema": "https://developer.joomla.org/schemas/json-schema/web_assets.json",
+  "name": "customize",
+  "version": "1.0.0",
+  "description": "Joomla CMS - Customize mode engine",
+  "license": "GPL-2.0-or-later",
+  "assets": [
+    {
+      "name": "com_menus.customize",
+      "type": "style",
+      "uri": "customize/css/customize.min.css"
+    },
+    {
+      "name": "com_menus.customize.api",
+      "type": "script",
+      "uri": "customize/js/customize.api.min.js",
+      "dependencies": [
+        "core"
+      ],
+      "attributes": {
+        "defer": true
+      }
+    },
+    {
+      "name": "com_menus.customize.core",
+      "type": "script",
+      "uri": "customize/js/customize.core.min.js",
+      "dependencies": [
+        "com_menus.customize.api"
+      ],
+      "attributes": {
+        "defer": true
+      }
+    }
+  ]
+}
