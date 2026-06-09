@@ -23,6 +23,9 @@
 
     var toolbar = null;
     var srStatus = null;
+    // After a reload (e.g. a cross-position move re-renders the frame), re-select this element so the
+    // keyboard user keeps their place. {type, id, message}.
+    var pendingSelect = null;
     var current = null;
     var editing = false;
     // The element kept selected (outline + toolbar) while the user interacts with it (after a button
@@ -357,6 +360,19 @@
       dragType = null;
     };
 
+    // Ask the engine to put keyboard focus back on this element (matched by type + customize id) once
+    // the frame next reloads, optionally announcing a message. Used by plugins that reload after a
+    // keyboard action, e.g. moving a module to another position.
+    JC.selectAfterReload = function (el, message) {
+      if (el && el.getAttribute) {
+        pendingSelect = {
+          type: el.getAttribute('data-customize-type'),
+          id: el.getAttribute('data-customize-id'),
+          message: message || ''
+        };
+      }
+    };
+
     function setupSortable(doc) {
       Array.prototype.forEach.call(doc.querySelectorAll('[data-customize-type], [data-customize-dropzone]'), function (target) {
         var acceptType = target.getAttribute('data-customize-dropzone') || target.getAttribute('data-customize-type');
@@ -638,6 +654,10 @@
         return !!((JC.getAreaType(el.getAttribute('data-customize-type')) || {}).draggable);
       }
 
+      function isMovable(el) {
+        return typeof (JC.getAreaType(el.getAttribute('data-customize-type')) || {}).onMove === 'function';
+      }
+
       function isDeletable(el) {
         return typeof (JC.getAreaType(el.getAttribute('data-customize-type')) || {}).onDelete === 'function';
       }
@@ -663,7 +683,11 @@
           var shortcuts = ['Enter'];
 
           if (isDraggable(el)) {
-            shortcuts.push('Control+ArrowUp', 'Control+ArrowDown', 'Control+ArrowLeft', 'Control+ArrowRight');
+            shortcuts.push('Control+ArrowUp', 'Control+ArrowDown');
+          }
+
+          if (isMovable(el)) {
+            shortcuts.push('Control+ArrowLeft', 'Control+ArrowRight');
           }
 
           if (isDeletable(el)) {
@@ -738,80 +762,6 @@
           var now = peers();
           var tmpl = JC.text('COM_MENUS_CUSTOMIZE_AREA_MOVED', 'Moved to position %1$s of %2$s');
           srStatus.textContent = describe(el) + '. ' + tmpl.replace('%1$s', now.indexOf(el) + 1).replace('%2$s', now.length);
-        }
-      }
-
-      // The template positions present on the page, in document order (modules + empty drop zones).
-      function positionsOnPage() {
-        var seen = {};
-        var list = [];
-
-        Array.prototype.forEach.call(doc.querySelectorAll('[data-customize-position], [data-customize-droppos]'), function (el) {
-          var p = el.getAttribute('data-customize-position') || el.getAttribute('data-customize-droppos');
-
-          if (p && !seen[p]) {
-            seen[p] = true;
-            list.push(p);
-          }
-        });
-
-        return list;
-      }
-
-      // An insertion reference inside a position: its empty drop zone, else its first module.
-      function refInPosition(position) {
-        var dropZone = null;
-        var firstModule = null;
-
-        Array.prototype.forEach.call(doc.querySelectorAll('[data-customize-droppos], [data-customize-type="module"]'), function (el) {
-          if (!dropZone && el.getAttribute('data-customize-droppos') === position) {
-            dropZone = el;
-          } else if (!firstModule && el.getAttribute('data-customize-type') === 'module' && el.getAttribute('data-customize-position') === position) {
-            firstModule = el;
-          }
-        });
-
-        return dropZone || firstModule;
-      }
-
-      // Send a draggable block to the previous/next template position on the page (keyboard equivalent
-      // of dragging it onto another position). Persists via onReorder, the same path as a cross-position
-      // drop.
-      function moveToPosition(el, dir) {
-        var positions = positionsOnPage();
-
-        if (positions.length < 2) {
-          return;
-        }
-
-        var current = el.getAttribute('data-customize-position');
-        var target = positions[(positions.indexOf(current) + dir + positions.length) % positions.length];
-
-        if (!target || target === current) {
-          return;
-        }
-
-        var ref = refInPosition(target);
-
-        if (!ref) {
-          return;
-        }
-
-        ref.parentNode.insertBefore(el, ref);
-        el.setAttribute('data-customize-position', target);
-
-        var type = el.getAttribute('data-customize-type');
-        var def = JC.getAreaType(type);
-
-        if (def && typeof def.onReorder === 'function') {
-          def.onReorder({ dragged: el, target: ref, doc: doc, type: type });
-        }
-
-        el.focus();
-        showFor(el, doc);
-
-        if (srStatus) {
-          srStatus.textContent = describe(el) + '. ' + JC.text('COM_MENUS_CUSTOMIZE_AREA_MOVED_TO', 'Moved to %s').replace('%s', target);
         }
       }
 
@@ -921,9 +871,11 @@
         }
 
         if (event.ctrlKey && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
-          if (isDraggable(el) && el.hasAttribute('data-customize-position')) {
+          var areaDef = JC.getAreaType(el.getAttribute('data-customize-type'));
+
+          if (areaDef && typeof areaDef.onMove === 'function') {
             event.preventDefault();
-            moveToPosition(el, event.key === 'ArrowLeft' ? -1 : 1);
+            areaDef.onMove({ el: el, doc: doc, dir: event.key === 'ArrowLeft' ? -1 : 1 });
           }
 
           return;
@@ -967,6 +919,27 @@
           }
         }
       });
+
+      // If a plugin asked to keep the user's place across this reload, re-select that element now.
+      if (pendingSelect) {
+        var want = pendingSelect;
+        pendingSelect = null;
+        var match = null;
+
+        Array.prototype.forEach.call(doc.querySelectorAll('[data-customize-type]'), function (a) {
+          if (!match && a.getAttribute('data-customize-type') === want.type && a.getAttribute('data-customize-id') === want.id) {
+            match = a;
+          }
+        });
+
+        if (match) {
+          select(match);
+
+          if (want.message && srStatus) {
+            srStatus.textContent = describe(match) + '. ' + want.message;
+          }
+        }
+      }
     }
 
     frame.addEventListener('load', function () {

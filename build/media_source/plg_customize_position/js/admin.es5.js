@@ -86,7 +86,7 @@
     removeMoveBar();
   }
 
-  function openSelector(doc) {
+  function openSelector(doc, dirHint) {
     var bar = moveBar;
     bar.textContent = t('JGLOBAL_LOADING', 'Loading…');
 
@@ -138,6 +138,11 @@
 
         JC.callAction('position', 'move', { id: pending.getAttribute('data-customize-id'), position: sel.value }).then(function (r) {
           if (r && r.success) {
+            // Keep the keyboard user on the module once the frame re-renders in its new position.
+            if (JC.selectAfterReload) {
+              JC.selectAfterReload(pending, t('COM_MENUS_CUSTOMIZE_AREA_MOVED_TO', 'Moved to %s').replace('%s', sel.value));
+            }
+
             pending = null;
             moveBar = null;
             reloadFrame();
@@ -152,6 +157,40 @@
           save.textContent = t('COM_MENUS_CUSTOMIZE_SAVE', 'Save');
           JC.ui.toast(doc, t('PLG_CUSTOMIZE_POSITION_SAVE_ERROR', 'Save error.'));
         });
+      });
+
+      // Keyboard operation: pre-step the selection (Ctrl+Left/Right opened this), focus the picker, and
+      // let arrows/Ctrl+arrows choose, Enter save, Escape cancel.
+      if (dirHint) {
+        var count = sel.options.length;
+
+        if (count) {
+          sel.selectedIndex = (sel.selectedIndex + dirHint + count) % count;
+        }
+      }
+
+      sel.focus();
+
+      bar.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          save.click();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          var module = pending;
+          cancelMove();
+
+          if (module && module.focus) {
+            module.focus();
+          }
+        } else if (e.ctrlKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+          e.preventDefault();
+          var len = sel.options.length;
+
+          if (len) {
+            sel.selectedIndex = (sel.selectedIndex + (e.key === 'ArrowLeft' ? -1 : 1) + len) % len;
+          }
+        }
       });
     });
   }
@@ -399,6 +438,19 @@
 
       info.dragged.setAttribute('data-customize-position', position);
       saveOrder(info.doc, position);
+    },
+    // Keyboard "send to position": Ctrl+Left/Right opens the same picker the drag move-bar uses, with
+    // the full list of template positions (not only those currently on the page).
+    onMove: function (info) {
+      if (!isModuleEl(info.el)) {
+        return;
+      }
+
+      cancelMove();
+      createMoveBar(info.doc);
+      pending = info.el;
+      pending.classList.add('customize-pending');
+      openSelector(info.doc, info.dir);
     },
     onDelete: function (info) {
       return JC.callAction('position', 'delete', { id: info.el.getAttribute('data-customize-id') }).then(function (res) {
