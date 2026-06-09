@@ -488,6 +488,9 @@
       overlay = null;
       toolbar = null;
       current = null;
+      // Any in-progress edit is gone with the old document; clear the flag so hover works again
+      // (e.g. when a plugin reloads the frame to apply a save).
+      editing = false;
 
       var doc = frameDoc();
 

@@ -369,11 +369,13 @@
 
       JC.callAction('language', 'save', { key: ctx.data.id, value: value }).then(function (res) {
         if (res && res.success) {
+          // teardown() first so customize:edit-end fires (re-enabling hover) before the reload.
+          teardown();
+
           // If the edit introduced a placeholder, the value is now a format and must be re-rendered.
           if (PLACEHOLDER.test(value)) {
             reloadFrame();
           } else {
-            teardown();
             JC.ui.toast(doc, t('PLG_CUSTOMIZE_LANGUAGE_SAVED', 'Translation saved.'));
           }
         } else {
