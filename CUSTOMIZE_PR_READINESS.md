@@ -16,14 +16,14 @@ Audit date: 2026-06-10.
 - Keyboard + ARIA + live-region announcements implemented (DOM-verified).
 
 ## Hard blockers
-- [~] **Tests.** Started: `tests/Unit/Libraries/Cms/Customize/CustomizeModeTest.php` covers the
-      runtime (detect/isActive, recordString + isRecordable rules, recordSprintf). Still need unit
-      tests for each plugin's ajax actions (harder: they touch db/session/filesystem) and
-      system/Cypress tests (`tests/System`) for the flow.
+- [~] **Tests.** 18 unit tests passing: `CustomizeModeTest` (runtime: detect/isActive, recordString
+      + isRecordable, recordSprintf) and the event-handler tests for the module, position and view
+      plugins (markup injection, drop zone, block wrapping). Still need unit tests for each plugin's
+      *ajax* actions (harder: they touch db/session/filesystem) and system/Cypress tests
+      (`tests/System`) for the flow.
 - [x] **Update SQL.** Done. Idempotent `INSERT ... WHERE NOT EXISTS` for the 5 plugins in
-      `administrator/components/com_admin/sql/updates/{mysql,postgresql}/6.1.0-2026-06-10.sql`
-      (validated on the test DB: applies clean, stays at 5 rows). Rename the file if the feature
-      targets a different version.
+      `administrator/components/com_admin/sql/updates/{mysql,postgresql}/6.2.0-2026-06-10.sql`
+      (targeting 6.2.0; validated on the test DB: applies clean, stays at 5 rows).
 - [ ] **Asset pipeline -> upstream conventions.** The `joomla.asset.json` manifests already live in
       `build/media_source` and the standard build copies them into `media/` (recreate-media.mjs copies
       media_source wholesale), so that part is fine. The remaining work is the registration switch:
