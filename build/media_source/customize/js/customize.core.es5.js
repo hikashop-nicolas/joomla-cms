@@ -415,6 +415,40 @@
       positionFor(el, doc);
     }
 
+    // Run an element's primary (first applicable) button action, and select it. Shared by
+    // double-click and the keyboard Enter/Space activation.
+    function triggerPrimary(el, doc) {
+      var type = el.getAttribute('data-customize-type');
+      var buttons = JC.getButtons(type);
+      var primary = null;
+
+      for (var i = 0; i < buttons.length; i++) {
+        if (!buttons[i].requires || el.hasAttribute('data-customize-' + buttons[i].requires)) {
+          primary = buttons[i];
+          break;
+        }
+      }
+
+      if (!primary || typeof primary.onClick !== 'function') {
+        return;
+      }
+
+      if (current !== el) {
+        showFor(el, doc);
+      }
+
+      pinned = el;
+      primary.onClick({
+        el: el,
+        doc: doc,
+        type: type,
+        name: el.getAttribute('data-customize-name') || '',
+        data: dataset(el),
+        callAction: JC.callAction,
+        emit: JC.emit
+      });
+    }
+
     // Carry customize=1 across in-iframe navigation (same-origin links and forms), so the mode
     // persists without making it sticky in the session (which would leak into normal browsing).
     function carryCustomize(doc) {
@@ -529,47 +563,159 @@
 
         var el = event.target.closest ? event.target.closest('[data-customize-type]') : null;
 
-        if (!el) {
-          return;
+        if (el) {
+          event.preventDefault();
+          triggerPrimary(el, doc);
         }
-
-        var type = el.getAttribute('data-customize-type');
-        var buttons = JC.getButtons(type);
-        var primary = null;
-
-        for (var i = 0; i < buttons.length; i++) {
-          if (!buttons[i].requires || el.hasAttribute('data-customize-' + buttons[i].requires)) {
-            primary = buttons[i];
-            break;
-          }
-        }
-
-        if (!primary || typeof primary.onClick !== 'function') {
-          return;
-        }
-
-        event.preventDefault();
-
-        if (current !== el) {
-          showFor(el, doc);
-        }
-
-        pinned = el;
-        primary.onClick({
-          el: el,
-          doc: doc,
-          type: type,
-          name: el.getAttribute('data-customize-name') || '',
-          data: dataset(el),
-          callAction: JC.callAction,
-          emit: JC.emit
-        });
       });
 
       JC.emit('customize:frame-ready', { doc: doc, areas: areas.length });
 
-      // Wire drag-to-reorder after plugins have tagged their areas/zones.
+      // After plugins have tagged their areas/zones: wire keyboard access and drag-to-reorder.
+      setupKeyboard(doc);
       setupSortable(doc);
+    }
+
+    // Keyboard access: make the areas reachable and operable without a mouse. A roving tabindex keeps
+    // the page to a single Tab stop; arrows move between areas; focusing an area selects it (parity
+    // with hover); Enter/Space runs its primary action; Tab reaches the toolbar; Escape deselects.
+    // The area set is read live (plugins tag some areas, e.g. translatable strings, after load) and
+    // each area is made focusable lazily, so late-added areas are reachable too.
+    function setupKeyboard(doc) {
+      var tabStop = null;
+
+      function ensureArea(el) {
+        if (!el.hasAttribute('tabindex')) {
+          el.setAttribute('tabindex', '-1');
+        }
+
+        if (!el.getAttribute('aria-label')) {
+          var type = el.getAttribute('data-customize-type');
+          var name = el.getAttribute('data-customize-name') || '';
+          var areaType = JC.getAreaType(type) || {};
+          el.setAttribute('aria-label', (areaType.label || type) + (name ? ' ' + name : ''));
+        }
+      }
+
+      function setTabStop(el) {
+        if (tabStop && tabStop !== el) {
+          tabStop.setAttribute('tabindex', '-1');
+        }
+
+        el.setAttribute('tabindex', '0');
+        tabStop = el;
+      }
+
+      function areaList() {
+        return Array.prototype.slice.call(doc.querySelectorAll('[data-customize-type]'));
+      }
+
+      // Move to and select an area (explicitly, not relying on focusin, which some hosts don't fire on
+      // a programmatic focus()).
+      function select(el) {
+        ensureArea(el);
+        setTabStop(el);
+        el.focus();
+        showFor(el, doc);
+        pinned = el;
+      }
+
+      var initial = areaList();
+      initial.forEach(ensureArea);
+
+      if (initial.length) {
+        setTabStop(initial[0]);
+      }
+
+      // Focusing an area (Tab or click) selects it and keeps it selected so the toolbar is reachable.
+      doc.addEventListener('focusin', function (event) {
+        if (editing) {
+          return;
+        }
+
+        var el = event.target.closest ? event.target.closest('[data-customize-type]') : null;
+
+        if (el) {
+          ensureArea(el);
+          setTabStop(el);
+          showFor(el, doc);
+          pinned = el;
+        }
+      });
+
+      // Clear the selection when focus leaves the areas and the toolbar entirely (e.g. tabbing out).
+      doc.addEventListener('focusout', function (event) {
+        if (editing) {
+          return;
+        }
+
+        var to = event.relatedTarget;
+        var inArea = to && to.closest && to.closest('[data-customize-type]');
+        var inToolbar = to && toolbar && toolbar.contains(to);
+
+        if (!inArea && !inToolbar && pinned) {
+          pinned = null;
+          hide();
+        }
+      });
+
+      doc.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+          // An open editor cancels itself on Escape; only deselect when focus is on a bare area/toolbar.
+          if (editing) {
+            return;
+          }
+
+          if (toolbar && toolbar.contains(event.target) && current) {
+            event.preventDefault();
+            current.focus();
+          } else {
+            var area = event.target.closest && event.target.closest('[data-customize-type]');
+
+            if (area && event.target === area) {
+              pinned = null;
+              hide();
+              area.blur();
+            }
+          }
+
+          return;
+        }
+
+        // Navigation/activation only when focus is on the area element itself (not an editor inside it).
+        var el = event.target.closest ? event.target.closest('[data-customize-type]') : null;
+
+        if (!el || event.target !== el || editing) {
+          return;
+        }
+
+        var list = areaList();
+        var idx = list.indexOf(el);
+
+        if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+          event.preventDefault();
+
+          if (list.length) {
+            select(list[(idx + 1) % list.length]);
+          }
+        } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+          event.preventDefault();
+
+          if (list.length) {
+            select(list[(idx - 1 + list.length) % list.length]);
+          }
+        } else if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          triggerPrimary(el, doc);
+        } else if (event.key === 'Tab' && !event.shiftKey) {
+          var firstBtn = toolbar && toolbar.querySelector('.customize-btn');
+
+          if (firstBtn) {
+            event.preventDefault();
+            firstBtn.focus();
+          }
+        }
+      });
     }
 
     frame.addEventListener('load', function () {
