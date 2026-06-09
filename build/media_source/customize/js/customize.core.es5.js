@@ -600,6 +600,10 @@
         return (areaType.label || type) + (name ? ' ' + name : '');
       }
 
+      function isDraggable(el) {
+        return !!((JC.getAreaType(el.getAttribute('data-customize-type')) || {}).draggable);
+      }
+
       function ensureArea(el) {
         if (!el.hasAttribute('tabindex')) {
           el.setAttribute('tabindex', '-1');
@@ -616,7 +620,8 @@
         }
 
         if (!el.getAttribute('aria-keyshortcuts')) {
-          el.setAttribute('aria-keyshortcuts', 'Enter');
+          // Draggable areas can also be reordered from the keyboard (the alternative to drag-and-drop).
+          el.setAttribute('aria-keyshortcuts', isDraggable(el) ? 'Enter Control+ArrowUp Control+ArrowDown' : 'Enter');
         }
 
         if (!el.getAttribute('aria-label')) {
@@ -624,7 +629,7 @@
         }
       }
 
-      // Tell screen readers which area was entered (and how to edit it) via the live region.
+      // Tell screen readers which area was entered (and how to edit/move it) via the live region.
       function announce(el) {
         if (!srStatus) {
           return;
@@ -632,8 +637,54 @@
 
         var msg = describe(el) + '. ' + JC.text('COM_MENUS_CUSTOMIZE_AREA_HINT', 'Press Enter to edit');
 
+        if (isDraggable(el)) {
+          msg += '. ' + JC.text('COM_MENUS_CUSTOMIZE_AREA_MOVE_HINT', 'Hold Ctrl and press Up or Down to move');
+        }
+
         if (srStatus.textContent !== msg) {
           srStatus.textContent = msg;
+        }
+      }
+
+      // Move a draggable block among its same-type peers in the same container (keyboard equivalent of
+      // drag-and-drop), persist via the type's onReorder, keep focus on it, and announce the new spot.
+      function moveBlock(el, dir) {
+        var type = el.getAttribute('data-customize-type');
+        var position = el.getAttribute('data-customize-position');
+        var parent = el.parentNode;
+
+        function peers() {
+          return Array.prototype.filter.call(parent.children, function (c) {
+            if (!c.getAttribute || c.getAttribute('data-customize-type') !== type) {
+              return false;
+            }
+
+            return !position || c.getAttribute('data-customize-position') === position;
+          });
+        }
+
+        var siblings = peers();
+        var swap = siblings[siblings.indexOf(el) + dir];
+
+        if (!swap) {
+          return;
+        }
+
+        parent.insertBefore(el, dir < 0 ? swap : swap.nextSibling);
+
+        var def = JC.getAreaType(type);
+
+        if (def && typeof def.onReorder === 'function') {
+          def.onReorder({ dragged: el, target: el, doc: doc, type: type });
+        }
+
+        el.focus();
+        showFor(el, doc);
+
+        if (srStatus) {
+          var now = peers();
+          var tmpl = JC.text('COM_MENUS_CUSTOMIZE_AREA_MOVED', 'Moved to position %1$s of %2$s');
+          srStatus.textContent = describe(el) + '. ' + tmpl.replace('%1$s', now.indexOf(el) + 1).replace('%2$s', now.length);
         }
       }
 
@@ -728,6 +779,16 @@
         var el = event.target.closest ? event.target.closest('[data-customize-type]') : null;
 
         if (!el || event.target !== el || editing) {
+          return;
+        }
+
+        // Ctrl+Up/Down reorders a draggable block (the keyboard alternative to drag-and-drop).
+        if (event.ctrlKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+          if (isDraggable(el)) {
+            event.preventDefault();
+            moveBlock(el, event.key === 'ArrowUp' ? -1 : 1);
+          }
+
           return;
         }
 
