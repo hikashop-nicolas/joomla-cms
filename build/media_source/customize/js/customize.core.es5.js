@@ -22,6 +22,7 @@
     }
 
     var toolbar = null;
+    var srStatus = null;
     var current = null;
     var editing = false;
     // The element kept selected (outline + toolbar) while the user interacts with it (after a button
@@ -66,7 +67,14 @@
       toolbar.className = 'customize-toolbar';
       toolbar.style.display = 'none';
 
+      // A visually hidden live region so screen readers hear which area was entered.
+      srStatus = doc.createElement('div');
+      srStatus.className = 'customize-sr-status';
+      srStatus.setAttribute('aria-live', 'polite');
+      srStatus.setAttribute('aria-atomic', 'true');
+
       doc.body.appendChild(toolbar);
+      doc.body.appendChild(srStatus);
     }
 
     function hide() {
@@ -584,16 +592,48 @@
     function setupKeyboard(doc) {
       var tabStop = null;
 
+      // A human label for an area: its type label plus the item name, e.g. "Layout block item".
+      function describe(el) {
+        var type = el.getAttribute('data-customize-type');
+        var name = el.getAttribute('data-customize-name') || '';
+        var areaType = JC.getAreaType(type) || {};
+        return (areaType.label || type) + (name ? ' ' + name : '');
+      }
+
       function ensureArea(el) {
         if (!el.hasAttribute('tabindex')) {
           el.setAttribute('tabindex', '-1');
         }
 
+        // Announce each area as a named, activatable "Customize area" (role=group is valid when areas
+        // nest, e.g. a layout block containing editable text).
+        if (!el.getAttribute('role')) {
+          el.setAttribute('role', 'group');
+        }
+
+        if (!el.getAttribute('aria-roledescription')) {
+          el.setAttribute('aria-roledescription', JC.text('COM_MENUS_CUSTOMIZE_AREA_ROLEDESCRIPTION', 'Customize area'));
+        }
+
+        if (!el.getAttribute('aria-keyshortcuts')) {
+          el.setAttribute('aria-keyshortcuts', 'Enter');
+        }
+
         if (!el.getAttribute('aria-label')) {
-          var type = el.getAttribute('data-customize-type');
-          var name = el.getAttribute('data-customize-name') || '';
-          var areaType = JC.getAreaType(type) || {};
-          el.setAttribute('aria-label', (areaType.label || type) + (name ? ' ' + name : ''));
+          el.setAttribute('aria-label', describe(el));
+        }
+      }
+
+      // Tell screen readers which area was entered (and how to edit it) via the live region.
+      function announce(el) {
+        if (!srStatus) {
+          return;
+        }
+
+        var msg = describe(el) + '. ' + JC.text('COM_MENUS_CUSTOMIZE_AREA_HINT', 'Press Enter to edit');
+
+        if (srStatus.textContent !== msg) {
+          srStatus.textContent = msg;
         }
       }
 
@@ -618,6 +658,7 @@
         el.focus();
         showFor(el, doc);
         pinned = el;
+        announce(el);
       }
 
       var initial = areaList();
@@ -640,6 +681,7 @@
           setTabStop(el);
           showFor(el, doc);
           pinned = el;
+          announce(el);
         }
       });
 
@@ -720,6 +762,7 @@
 
     frame.addEventListener('load', function () {
       toolbar = null;
+      srStatus = null;
       current = null;
       // Any in-progress edit/selection is gone with the old document; clear the flags so hover works
       // again (e.g. when a plugin reloads the frame to apply a save).

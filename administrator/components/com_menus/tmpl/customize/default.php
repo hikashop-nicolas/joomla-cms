@@ -59,6 +59,8 @@ Text::script('COM_MENUS_CUSTOMIZE_REMOVE_HINT');
 Text::script('COM_MENUS_CUSTOMIZE_STATUS_ACTIVE');
 Text::script('COM_MENUS_CUSTOMIZE_STATUS_CROSS_ORIGIN');
 Text::script('COM_MENUS_CUSTOMIZE_STATUS_INACTIVE');
+Text::script('COM_MENUS_CUSTOMIZE_AREA_ROLEDESCRIPTION');
+Text::script('COM_MENUS_CUSTOMIZE_AREA_HINT');
 
 // Let customize plugins register their own JS strings and admin assets.
 $app = Factory::getApplication();
