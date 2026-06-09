@@ -370,6 +370,9 @@ class HtmlView extends AbstractView implements CurrentUserInterface
         // Clean the template name
         $layoutTemplate  = isset($layoutTemplate) ? preg_replace('/[^A-Z0-9_-]/i', '', $layoutTemplate) : $layoutTemplate;
 
+        // Remember the sub-layout name for the customize hook below ($tpl is unset before the include).
+        $customizeBlock = $tpl;
+
         if (Factory::getApplication()->getDocument()->getType() !== 'html') {
             try {
                 // Load the language file for the template
@@ -425,6 +428,31 @@ class HtmlView extends AbstractView implements CurrentUserInterface
             // Done with the requested template; get the buffer and
             // clear it.
             $this->_output = ob_get_clean();
+
+            // Customize mode: fire a hook so the customize "view" plugin can instrument this
+            // sub-layout's output. Core only dispatches the event and uses the returned string; it
+            // holds no knowledge of the customize markup itself.
+            if (
+                $customizeBlock !== null
+                && \Joomla\CMS\Customize\CustomizeMode::isActive()
+                && Factory::getApplication()->getDocument()->getType() === 'html'
+            ) {
+                $app   = Factory::getApplication();
+                $event = new \Joomla\CMS\Event\GenericEvent('onCustomizeRenderView', [
+                    'subject'   => $this,
+                    'output'    => $this->_output,
+                    'component' => $app->getInput()->getCmd('option', ''),
+                    'view'      => $this->getName(),
+                    'layout'    => $layout,
+                    'block'     => $customizeBlock,
+                ]);
+                $app->getDispatcher()->dispatch('onCustomizeRenderView', $event);
+                $customized = $event->getArgument('output');
+
+                if (\is_string($customized)) {
+                    $this->_output = $customized;
+                }
+            }
 
             return $this->_output;
         }

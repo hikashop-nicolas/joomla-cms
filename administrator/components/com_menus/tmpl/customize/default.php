@@ -44,7 +44,8 @@ $this->getDocument()->addScriptOptions('customize', [
     'ajaxBase' => 'index.php?option=com_ajax&group=customize&format=json',
     'token'    => Session::getFormToken(),
     'frameId'  => 'customize-frame',
-    'frameCss' => Uri::root() . 'media/customize/css/customize-frame.css',
+    // Version by file mtime so an iframe-CSS deploy busts the cache automatically (no hard reload).
+    'frameCss' => Uri::root() . 'media/customize/css/customize-frame.css?' . (@filemtime(JPATH_ROOT . '/media/customize/css/customize-frame.css') ?: $this->getDocument()->getMediaVersion()),
     'tinymceSrc' => Uri::root() . 'media/vendor/tinymce/tinymce.min.js',
 ]);
 
