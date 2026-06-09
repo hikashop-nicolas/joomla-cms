@@ -47,6 +47,15 @@ final class CustomizeMode
     private static $strings = [];
 
     /**
+     * Map of rendered sprintf result => ['key' => key, 'format' => format], so a composed string
+     * like "Written by: Admin" can be matched on the page and its format edited (customize mode).
+     *
+     * @var    array<string, array{key: string, format: string}>
+     * @since  __DEPLOY_VERSION__
+     */
+    private static $sprintf = [];
+
+    /**
      * Resolve the customize state for the current request from the URL flag.
      *
      * @param   CMSApplicationInterface  $app  The current application.
@@ -85,9 +94,24 @@ final class CustomizeMode
      */
     public static function recordString(string $key, string $text): void
     {
-        if (!isset(self::$strings[$key])) {
+        if (!isset(self::$strings[$key]) && self::isRecordable($text)) {
             self::$strings[$key] = $text;
         }
+    }
+
+    /**
+     * Whether a string is suitable to record: short, plain, single-line text. This keeps the map from
+     * breaking the JSON island or carrying HTML/composed output that would not match a text node.
+     *
+     * @param   string  $text  The candidate string.
+     *
+     * @return  boolean
+     *
+     * @since   __DEPLOY_VERSION__
+     */
+    private static function isRecordable(string $text): bool
+    {
+        return $text !== '' && \strlen($text) <= 200 && !str_contains($text, '<') && !preg_match('/[\x00-\x1F]/', $text);
     }
 
     /**
@@ -100,5 +124,41 @@ final class CustomizeMode
     public static function getStrings(): array
     {
         return self::$strings;
+    }
+
+    /**
+     * Record a composed (sprintf) string: its rendered result mapped to its key and format.
+     *
+     * @param   string  $key       The (upper-cased) language key.
+     * @param   string  $format    The translated format string (with placeholders).
+     * @param   string  $rendered  The result after substitution.
+     *
+     * @return  void
+     *
+     * @since   __DEPLOY_VERSION__
+     */
+    public static function recordSprintf(string $key, string $format, string $rendered): void
+    {
+        // Nothing useful to match if no substitution happened, or if the result is not plain text
+        // (HTML-bearing composed strings won't match a text node; the format prefix is used instead).
+        if ($rendered === $format || !self::isRecordable($rendered)) {
+            return;
+        }
+
+        if (!isset(self::$sprintf[$rendered])) {
+            self::$sprintf[$rendered] = ['key' => $key, 'format' => $format];
+        }
+    }
+
+    /**
+     * Get the recorded rendered-result => {key, format} map for composed strings.
+     *
+     * @return  array<string, array{key: string, format: string}>
+     *
+     * @since   __DEPLOY_VERSION__
+     */
+    public static function getSprintf(): array
+    {
+        return self::$sprintf;
     }
 }

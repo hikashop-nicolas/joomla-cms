@@ -9,6 +9,7 @@
 
 namespace Joomla\CMS\Language;
 
+use Joomla\CMS\Customize\CustomizeMode;
 use Joomla\CMS\Factory;
 
 // phpcs:disable PSR1.Files.SideEffects
@@ -277,7 +278,15 @@ class Text
         // Replace custom named placeholders with sprintf style placeholders
         $args[0] = preg_replace('/\[\[%([0-9]+):[^\]]*\]\]/', '%\1$s', $args[0]);
 
-        return \call_user_func_array('sprintf', $args);
+        $result = \call_user_func_array('sprintf', $args);
+
+        if (CustomizeMode::isActive()) {
+            // Record the rendered result + format so the customize editor can match the composed
+            // string on the page and offer editing of its format.
+            CustomizeMode::recordSprintf(strtoupper($string), $args[0], $result);
+        }
+
+        return $result;
     }
 
     /**

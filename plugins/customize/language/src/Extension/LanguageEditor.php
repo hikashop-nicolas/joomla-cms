@@ -73,8 +73,9 @@ final class LanguageEditor extends CMSPlugin implements SubscriberInterface
         }
 
         $strings = CustomizeMode::getStrings();
+        $sprintf = CustomizeMode::getSprintf();
 
-        if (!$strings) {
+        if (!$strings && !$sprintf) {
             return;
         }
 
@@ -85,12 +86,15 @@ final class LanguageEditor extends CMSPlugin implements SubscriberInterface
             return;
         }
 
-        $json = json_encode(
-            $strings,
-            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
-        );
+        $json = json_encode(['strings' => $strings, 'sprintf' => $sprintf], JSON_INVALID_UTF8_SUBSTITUTE);
 
-        $script = '<script type="application/json" id="customize-lang-map">' . $json . '</script>';
+        if ($json === false) {
+            return;
+        }
+
+        // Base64 so no recorded value (which may contain HTML or even a stray </script>) can break
+        // the island tag; the editor decodes it.
+        $script = '<script type="application/json" id="customize-lang-map">' . base64_encode($json) . '</script>';
 
         $app->setBody(preg_replace('/<\/body>/i', $script . '</body>', $body, 1));
     }
@@ -171,6 +175,8 @@ final class LanguageEditor extends CMSPlugin implements SubscriberInterface
             [
                 'PLG_CUSTOMIZE_LANGUAGE_AREA',
                 'PLG_CUSTOMIZE_LANGUAGE_BTN_EDIT',
+                'PLG_CUSTOMIZE_LANGUAGE_FORMAT_HINT',
+                'PLG_CUSTOMIZE_LANGUAGE_LABEL',
                 'PLG_CUSTOMIZE_LANGUAGE_SAVED',
                 'PLG_CUSTOMIZE_LANGUAGE_SAVE_ERROR',
                 'PLG_CUSTOMIZE_LANGUAGE_SAVE_FAILED',

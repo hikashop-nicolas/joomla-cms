@@ -130,6 +130,12 @@
   font-weight: 600;
 }
 
+.customize-hint {
+  margin: 2px 0 6px;
+  color: #6c757d;
+  font-size: 11px;
+}
+
 .customize-check {
   display: flex;
   align-items: center;
