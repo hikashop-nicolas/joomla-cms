@@ -83,6 +83,7 @@ Factory::getContainer()->get(DispatcherInterface::class)
     </div>
     <aside class="customize-panel">
         <?php if ($this->previewUrl) : ?>
+            <div id="customize-status" class="customize-status" role="status"></div>
             <a class="customize-open-external btn btn-outline-secondary btn-sm"
                 href="<?php echo htmlspecialchars($this->previewUrl, ENT_QUOTES); ?>"
                 target="_blank" rel="noopener"><?php echo Text::_('COM_MENUS_CUSTOMIZE_OPEN_FRONTEND'); ?></a>

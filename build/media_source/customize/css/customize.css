@@ -53,6 +53,11 @@
   border: 1px solid #dee2e6;
 }
 
+/* No status set yet (before the first frame load): keep the panel clean. */
+.customize-status:empty {
+  display: none;
+}
+
 .customize-status.is-ok {
   border-color: #198754;
   color: #0f5132;

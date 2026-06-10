@@ -952,7 +952,11 @@ document.addEventListener('DOMContentLoaded', function () {
       var doc = frameDoc();
 
       if (!doc) {
-        setStatus(JC.text('COM_MENUS_CUSTOMIZE_STATUS_CROSS_ORIGIN', 'Cross-origin frontend: live editing needs the postMessage fallback.'), false);
+        // The browser blocks reading the iframe when the frontend is served from a different origin
+        // than the administrator. Customize drives the page through direct same-origin DOM access by
+        // design, so those (uncommon) setups are not editable; surface a clear status instead of
+        // failing silently. Cross-origin support would require a postMessage agent in the frontend.
+        setStatus(JC.text('COM_MENUS_CUSTOMIZE_STATUS_CROSS_ORIGIN', 'Live editing is unavailable: the site frontend is on a different origin from the administrator.'), false);
         return;
       }
 
