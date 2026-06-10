@@ -156,26 +156,21 @@ final class View extends CMSPlugin implements SubscriberInterface
      */
     private function doOverride(array $payload): string
     {
-        $component = preg_replace('/[^a-zA-Z0-9_]/', '', (string) ($payload['component'] ?? ''));
-        $view      = preg_replace('/[^a-zA-Z0-9_]/', '', (string) ($payload['view'] ?? ''));
-        $layout    = preg_replace('/[^a-zA-Z0-9_.\-]/', '', (string) ($payload['layout'] ?? ''));
-        $block     = preg_replace('/[^a-zA-Z0-9_.\-]/', '', (string) ($payload['block'] ?? ''));
+        $parts = self::sanitizeOverrideRequest($payload);
 
-        if ($component === '' || $view === '' || $layout === '') {
+        if ($parts === null) {
             return $this->fail(Text::_('PLG_CUSTOMIZE_VIEW_ERROR_INVALID'));
         }
 
-        $fileName = ($block !== '' ? $layout . '_' . $block : $layout) . '.php';
-        $source   = JPATH_SITE . '/components/' . $component . '/tmpl/' . $view . '/' . $fileName;
+        $source = JPATH_SITE . '/' . $parts['source'];
 
         if (!is_file($source)) {
             return $this->fail(Text::_('PLG_CUSTOMIZE_VIEW_NO_SOURCE'));
         }
 
-        // Use the template that actually rendered the customized page (captured on the frontend and
-        // sent by the client); templateExtensionId() below validates it is a real site template.
-        $template = preg_replace('/[^a-zA-Z0-9_\-]/', '', (string) ($payload['template'] ?? ''));
-        $extId    = $this->templateExtensionId($template);
+        // Validate that the template (captured on the frontend, sent by the client) is a real site
+        // template before writing into its tree.
+        $extId = $this->templateExtensionId($parts['template']);
 
         if (!$extId) {
             return $this->fail(Text::_('PLG_CUSTOMIZE_VIEW_OVERRIDE_FAILED'));
@@ -183,8 +178,7 @@ final class View extends CMSPlugin implements SubscriberInterface
 
         // Use JPATH_SITE explicitly: this handler runs in the admin app, where JPATH_THEMES would be
         // the administrator templates directory.
-        $relPath      = '/html/' . $component . '/' . $view . '/' . $fileName;
-        $overrideFile = JPATH_SITE . '/templates/' . $template . $relPath;
+        $overrideFile = JPATH_SITE . '/templates/' . $parts['template'] . $parts['relPath'];
 
         // Create the override once; never overwrite an existing (possibly user-edited) one.
         if (!is_file($overrideFile)) {
@@ -196,11 +190,49 @@ final class View extends CMSPlugin implements SubscriberInterface
         }
 
         // Native template-editor URL (see com_templates TemplateModel::getFile / TemplateController).
-        $fileParam = base64_encode(str_replace('\\', '//', $relPath));
+        $fileParam = base64_encode(str_replace('\\', '//', $parts['relPath']));
         $url       = 'index.php?option=com_templates&view=template&id=' . (int) $extId
             . '&file=' . $fileParam . '&isMedia=0';
 
         return json_encode(['success' => true, 'url' => $url]);
+    }
+
+    /**
+     * Sanitise an override request and derive the (relative) component source + override paths. Every
+     * segment is reduced to a safe character set, so the result can never contain a "/" or ".." and
+     * thus cannot escape the components/ or templates/ trees.
+     *
+     * @param   array  $payload  The request payload (component, view, layout, block, template).
+     *
+     * @return  array|null  Keys component, view, layout, block, template, fileName, source, relPath;
+     *                      or null when component, view or layout is missing.
+     *
+     * @since   1.0.0
+     */
+    private static function sanitizeOverrideRequest(array $payload): ?array
+    {
+        $component = preg_replace('/[^a-zA-Z0-9_]/', '', (string) ($payload['component'] ?? ''));
+        $view      = preg_replace('/[^a-zA-Z0-9_]/', '', (string) ($payload['view'] ?? ''));
+        $layout    = preg_replace('/[^a-zA-Z0-9_.\-]/', '', (string) ($payload['layout'] ?? ''));
+        $block     = preg_replace('/[^a-zA-Z0-9_.\-]/', '', (string) ($payload['block'] ?? ''));
+        $template  = preg_replace('/[^a-zA-Z0-9_\-]/', '', (string) ($payload['template'] ?? ''));
+
+        if ($component === '' || $view === '' || $layout === '') {
+            return null;
+        }
+
+        $fileName = ($block !== '' ? $layout . '_' . $block : $layout) . '.php';
+
+        return [
+            'component' => $component,
+            'view'      => $view,
+            'layout'    => $layout,
+            'block'     => $block,
+            'template'  => $template,
+            'fileName'  => $fileName,
+            'source'    => 'components/' . $component . '/tmpl/' . $view . '/' . $fileName,
+            'relPath'   => '/html/' . $component . '/' . $view . '/' . $fileName,
+        ];
     }
 
     /**

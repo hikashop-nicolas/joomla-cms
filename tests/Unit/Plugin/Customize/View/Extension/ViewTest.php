@@ -104,4 +104,83 @@ class ViewTest extends UnitTestCase
 
         $this->assertSame('<div>article</div>', $event->getArgument('output'));
     }
+
+    /**
+     * Invoke the private static sanitizeOverrideRequest().
+     *
+     * @param   array  $payload  The request payload.
+     *
+     * @return  array|null
+     *
+     * @since   __DEPLOY_VERSION__
+     */
+    private function sanitize(array $payload)
+    {
+        $method = new \ReflectionMethod(View::class, 'sanitizeOverrideRequest');
+        $method->setAccessible(true);
+
+        return $method->invoke(null, $payload);
+    }
+
+    /**
+     * @testdox  builds the expected component source and override relative paths
+     *
+     * @return  void
+     *
+     * @since   __DEPLOY_VERSION__
+     */
+    public function testOverrideRequestBuildsExpectedPaths()
+    {
+        $parts = $this->sanitize([
+            'component' => 'com_content',
+            'view'      => 'featured',
+            'layout'    => 'default',
+            'block'     => 'item',
+            'template'  => 'cassiopeia',
+        ]);
+
+        $this->assertSame('components/com_content/tmpl/featured/default_item.php', $parts['source']);
+        $this->assertSame('/html/com_content/featured/default_item.php', $parts['relPath']);
+        $this->assertSame('cassiopeia', $parts['template']);
+    }
+
+    /**
+     * @testdox  strips path traversal from every segment so paths cannot escape their tree
+     *
+     * @return  void
+     *
+     * @since   __DEPLOY_VERSION__
+     */
+    public function testOverrideRequestStripsPathTraversal()
+    {
+        $parts = $this->sanitize([
+            'component' => 'com_content/../../etc',
+            'view'      => 'featured/..',
+            'layout'    => 'default',
+            'block'     => 'item',
+            'template'  => 'cassiopeia/../../foo',
+        ]);
+
+        foreach (['component', 'view', 'template'] as $segment) {
+            $this->assertStringNotContainsString('/', $parts[$segment]);
+            $this->assertStringNotContainsString('.', $parts[$segment]);
+        }
+
+        $this->assertStringNotContainsString('../', $parts['source']);
+        $this->assertStringNotContainsString('../', $parts['relPath']);
+    }
+
+    /**
+     * @testdox  rejects a request missing the component, view or layout
+     *
+     * @return  void
+     *
+     * @since   __DEPLOY_VERSION__
+     */
+    public function testOverrideRequestRejectsMissingSegments()
+    {
+        $this->assertNull($this->sanitize(['component' => '', 'view' => 'featured', 'layout' => 'default']));
+        $this->assertNull($this->sanitize(['component' => 'com_content', 'view' => '', 'layout' => 'default']));
+        $this->assertNull($this->sanitize(['view' => 'featured', 'layout' => 'default']));
+    }
 }

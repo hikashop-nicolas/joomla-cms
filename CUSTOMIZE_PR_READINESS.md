@@ -16,11 +16,12 @@ Audit date: 2026-06-10.
 - Keyboard + ARIA + live-region announcements implemented (DOM-verified).
 
 ## Hard blockers
-- [~] **Tests.** 18 unit tests passing: `CustomizeModeTest` (runtime: detect/isActive, recordString
-      + isRecordable, recordSprintf) and the event-handler tests for the module, position and view
-      plugins (markup injection, drop zone, block wrapping). Still need unit tests for each plugin's
-      *ajax* actions (harder: they touch db/session/filesystem) and system/Cypress tests
-      (`tests/System`) for the flow.
+- [~] **Tests.** 21 unit tests passing: `CustomizeModeTest` (runtime: detect/isActive, recordString
+      + isRecordable, recordSprintf); the event-handler tests for the module, position and view
+      plugins (markup injection, drop zone, block wrapping); and the view override path sanitizer
+      (extracted as `View::sanitizeOverrideRequest`, tested for correct paths, path-traversal
+      stripping, and rejection of missing segments). Still need tests for the rest of the plugins'
+      *ajax* actions (harder: static Session::checkToken + db + filesystem) and system/Cypress tests.
 - [x] **Update SQL.** Done. Idempotent `INSERT ... WHERE NOT EXISTS` for the 5 plugins in
       `administrator/components/com_admin/sql/updates/{mysql,postgresql}/6.2.0-2026-06-10.sql`
       (targeting 6.2.0; validated on the test DB: applies clean, stays at 5 rows).
@@ -38,7 +39,9 @@ Audit date: 2026-06-10.
 - [~] **PHP code standards.** Installing composer dev deps to run `php-cs-fixer` + `phpunit`.
 
 ## Likely required by reviewers
-- [ ] Dedicated security review of the file-writing handlers (template + language overrides).
+- [~] Dedicated security review of the file-writing handlers. The view override path resolver is now
+      extracted and unit-tested (no traversal possible); the language override writer and a broader
+      pass still want review.
 - [ ] Cross-origin / postMessage fallback, or document the same-origin-only limitation in the PR.
 - [ ] ES modules: maintainers may want `.es6.js` modules instead of the current `.es5.js` IIFEs.
 - [ ] Documentation: PR description + manual test steps + user docs.
