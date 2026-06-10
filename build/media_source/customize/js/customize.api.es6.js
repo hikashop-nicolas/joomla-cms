@@ -165,8 +165,11 @@
           promotion: false,
           menubar: false,
           statusbar: false,
-          plugins: 'lists link autolink',
-          toolbar: 'undo redo | bold italic underline | bullist numlist | link | removeformat',
+          plugins: 'lists link image autolink',
+          toolbar: 'undo redo | bold italic underline | bullist numlist | link image | removeformat',
+          // The "Image" button's browse control opens the host's Joomla media field (Media Manager).
+          file_picker_types: 'image',
+          file_picker_callback: JoomlaCustomize._mediaPicker,
           height: 240
         }).then(function (eds) {
           editor = eds && eds[0];
@@ -231,6 +234,45 @@
         s.onerror = function () { resolve(null); };
         (doc.head || doc.documentElement).appendChild(s);
       });
+    },
+
+    /**
+     * TinyMCE file-picker that reuses the host page's hidden Joomla media field, so the inline
+     * editor's "Image" button browses the Media Manager and inserts the chosen image. Runs in the
+     * host (parent) document; the callback inserts into the editor (which lives in the iframe).
+     */
+    _mediaPicker: function (callback) {
+      var host = window.document.getElementById('customize-media-host');
+      var field = host ? host.querySelector('joomla-field-media') : null;
+
+      if (!field) {
+        return;
+      }
+
+      var input = field.querySelector('input');
+
+      function onPicked() {
+        field.removeEventListener('change', onPicked);
+
+        var value = input ? input.value : '';
+        var url = value ? value.split('#')[0] : '';
+
+        if (url) {
+          callback(url, { alt: '' });
+        }
+      }
+
+      field.addEventListener('change', onPicked);
+
+      if (typeof field.show === 'function') {
+        field.show();
+      } else {
+        var btn = field.querySelector('button');
+
+        if (btn) {
+          btn.click();
+        }
+      }
     },
 
     /**
