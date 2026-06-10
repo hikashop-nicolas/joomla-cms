@@ -21,9 +21,13 @@ Audit date: 2026-06-10.
       and content plugins (module markup, drop zone, view-block markers, article-text wrapping with
       active/inactive/context/idempotency cases); and pure-logic security tests for the view override
       path sanitizer (`View::sanitizeOverrideRequest`) and the language override key/tag validators
-      (`LanguageEditor::sanitizeKey` / `safeLanguageTag`). The remaining ajax actions that mutate the
-      db / write files are integration-level (static `Session::checkToken` + model + filesystem) and
-      belong in system/Cypress tests, still to add.
+      (`LanguageEditor::sanitizeKey` / `safeLanguageTag`). Plus a Cypress system test
+      (`tests/System/integration/administrator/components/com_menus/Customize.cy.js`): it logs into
+      the admin, opens the customize host for the home menu item, and asserts the host renders
+      (toolbar title + preview iframe), the engine ES module loads (`window.JoomlaCustomize`), and the
+      module plugin's buttons registered (proving the import-map wiring resolves at runtime).
+      Run-verified against the local clone (passing). Further Cypress coverage of the individual edit
+      actions could be added, but the core flow is now covered.
 - [x] **Update SQL.** Done. Idempotent `INSERT ... WHERE NOT EXISTS` for the 5 plugins in
       `administrator/components/com_admin/sql/updates/{mysql,postgresql}/6.2.0-2026-06-10.sql`
       (targeting 6.2.0; validated on the test DB: applies clean, stays at 5 rows).

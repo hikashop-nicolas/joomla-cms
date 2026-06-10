@@ -58,7 +58,9 @@ SQL. All hooks are gated by `CustomizeMode::isActive()`, so there is no cost on 
 6. Use **Edit layout** on a view block; confirm a template override is created and the native template
    editor opens.
 
-Unit tests: `tests/Unit/Libraries/Cms/Customize` and `tests/Unit/Plugin/Customize/**`.
+Unit tests: `tests/Unit/Libraries/Cms/Customize` and `tests/Unit/Plugin/Customize/**`. System test:
+`tests/System/integration/administrator/components/com_menus/Customize.cy.js` (opens the host and
+checks the engine + plugins load).
 
 ## Known limitations
 
