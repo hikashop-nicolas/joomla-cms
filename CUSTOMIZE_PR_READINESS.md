@@ -24,14 +24,17 @@ Audit date: 2026-06-10.
 - [x] **Update SQL.** Done. Idempotent `INSERT ... WHERE NOT EXISTS` for the 5 plugins in
       `administrator/components/com_admin/sql/updates/{mysql,postgresql}/6.2.0-2026-06-10.sql`
       (targeting 6.2.0; validated on the test DB: applies clean, stays at 5 rows).
-- [ ] **Asset pipeline -> upstream conventions.** The `joomla.asset.json` manifests already live in
-      `build/media_source` and the standard build copies them into `media/` (recreate-media.mjs copies
-      media_source wholesale), so that part is fine. The remaining work is the registration switch:
-      WAM auto-loads component/template manifests, not a `media/customize/` path or plugin manifests,
-      so switching from path-based `registerAndUseScript` to by-name needs the canonical-path move
-      (engine into `media/com_menus/...`, merged into com_menus's manifest) + explicit
-      `addRegistryFile` for the plugin manifests. Also drop the local-only `build/build-customize.mjs`
-      for the PR (the standard build compiles `build/media_source`).
+- [~] **Asset pipeline -> upstream conventions.** Progress: the manifests now use convention names
+      (`customize.*`, `plg_customize_*.admin`), `build/build-customize.mjs` copies them into `media/`,
+      and the standard build copies `media_source` wholesale too, so the manifests reach `media/`.
+      BLOCKED on the registration switch: tried `$wa->getRegistry()->addExtensionRegistryFile('customize')`
+      + `useStyle`/`useScript` (the same runtime pattern com_content uses for com_contenthistory). In
+      this view it registers the assets (assetExists() is true, 12 registry files) but they never
+      render into the head, with either `com_menus.customize.*` or `customize.*` naming and the cache
+      cleared; the .min files are valid. So path-based `registerAndUseScript` is retained for now.
+      Needs WAM-internals investigation, or the canonical move of the engine into com_menus's
+      auto-loaded `media/com_menus/joomla.asset.json`. The local-only `build/build-customize.mjs`
+      should also be dropped for the PR (the standard build compiles `build/media_source`).
 - [~] **PHP code standards.** Installing composer dev deps to run `php-cs-fixer` + `phpunit`.
 
 ## Likely required by reviewers

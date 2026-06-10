@@ -7,7 +7,8 @@
  *
  * Usage: node build/build-customize.mjs
  */
-import { dirname, join } from 'node:path';
+import { copyFile, mkdir } from 'node:fs/promises';
+import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import recursive from 'recursive-readdir';
@@ -34,6 +35,11 @@ for (const folder of folders) {
       await handleES5File(file);
     } else if (file.endsWith('.css') && !file.endsWith('.min.css')) {
       await handleCssFile(file);
+    } else if (file.endsWith('joomla.asset.json')) {
+      // Copy the WebAsset manifest so WAM can register the assets by name (addExtensionRegistryFile).
+      const dest = file.replace(`${sep}build${sep}media_source${sep}`, `${sep}media${sep}`);
+      await mkdir(dirname(dest), { recursive: true });
+      await copyFile(file, dest);
     }
   }
 }

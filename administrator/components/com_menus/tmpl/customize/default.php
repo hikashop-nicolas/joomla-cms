@@ -21,6 +21,12 @@ use Joomla\CMS\Uri\Uri;
 // phpcs:enable PSR1.Files.SideEffects
 
 $wa = $this->getDocument()->getWebAssetManager();
+
+// The engine + plugins ship WebAsset manifests (media/customize/joomla.asset.json and
+// media/plg_customize_*/joomla.asset.json, names "customize.*" / "plg_customize_*.admin"). The
+// eventual upstream form is to register them by name via addExtensionRegistryFile() + useScript(),
+// but in this view that registers the assets (assetExists() is true) without ever rendering them, so
+// the explicit path-based registration is kept for now (see CUSTOMIZE_PR_READINESS.md).
 $wa->registerAndUseStyle('com_menus.customize', 'media/customize/css/customize.css');
 $wa->registerAndUseScript('com_menus.customize.api', 'media/customize/js/customize.api.js', [], ['defer' => true]);
 $wa->registerAndUseScript('com_menus.customize.core', 'media/customize/js/customize.core.js', [], ['defer' => true], ['com_menus.customize.api']);

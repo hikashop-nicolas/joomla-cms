@@ -10,7 +10,7 @@
       "type": "script",
       "uri": "plg_customize_module/js/admin.min.js",
       "dependencies": [
-        "com_menus.customize.api"
+        "customize.api"
       ],
       "attributes": {
         "defer": true
