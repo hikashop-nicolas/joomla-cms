@@ -170,6 +170,9 @@
           // The "Image" button's browse control opens the host's Joomla media field (Media Manager).
           file_picker_types: 'image',
           file_picker_callback: JoomlaCustomize._mediaPicker,
+          // Keep URLs as provided (root-relative), so they are not rewritten relative to the iframe's
+          // SEF page URL (which would 404). Matches how Joomla stores content image paths.
+          convert_urls: false,
           height: 240
         }).then(function (eds) {
           editor = eds && eds[0];
@@ -256,6 +259,13 @@
 
         var value = input ? input.value : '';
         var url = value ? value.split('#')[0] : '';
+
+        // The media field yields a path relative to the site root (e.g. "images/foo.jpg"); make it
+        // root-relative so it resolves in the article regardless of the page's (SEF) URL.
+        if (url && url.charAt(0) !== '/' && !/^https?:\/\//i.test(url)) {
+          var paths = (window.Joomla && window.Joomla.getOptions) ? (window.Joomla.getOptions('system.paths') || {}) : {};
+          url = (paths.root || '').replace(/\/$/, '') + '/' + url;
+        }
 
         if (url) {
           callback(url, { alt: '' });
