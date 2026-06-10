@@ -410,6 +410,10 @@ class HtmlView extends AbstractView implements CurrentUserInterface
         }
 
         if ($this->_template !== false) {
+            // Capture the resolved file now: a sub-layout included below may itself call loadTemplate(),
+            // which overwrites $this->_template, so reading it after the include would be the wrong file.
+            $renderedTemplate = $this->_template;
+
             // Unset so as not to introduce into template scope
             unset($tpl, $file);
 
@@ -445,9 +449,9 @@ class HtmlView extends AbstractView implements CurrentUserInterface
                     'view'      => $this->getName(),
                     'layout'    => $layout,
                     'block'     => $customizeBlock,
-                    'file'      => $this->_template,
+                    'file'      => $renderedTemplate,
                 ]);
-                $app->getDispatcher()->dispatch('onCustomizeRenderView', $event);
+                Factory::getContainer()->get(\Joomla\Event\DispatcherInterface::class)->dispatch('onCustomizeRenderView', $event);
                 $customized = $event->getArgument('output');
 
                 if (\is_string($customized)) {

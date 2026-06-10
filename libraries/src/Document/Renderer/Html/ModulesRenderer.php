@@ -58,7 +58,7 @@ class ModulesRenderer extends DocumentRenderer
             // Core only fires the hook and uses the returned string; it holds no customize markup.
             if ($customize && trim($moduleHtml) !== '') {
                 $customizeEvent = new GenericEvent('onCustomizeModule', ['subject' => $mod, 'position' => $position, 'output' => $moduleHtml]);
-                $app->getDispatcher()->dispatch('onCustomizeModule', $customizeEvent);
+                Factory::getContainer()->get(\Joomla\Event\DispatcherInterface::class)->dispatch('onCustomizeModule', $customizeEvent);
                 $customized = $customizeEvent->getArgument('output');
 
                 if (\is_string($customized)) {
@@ -77,7 +77,7 @@ class ModulesRenderer extends DocumentRenderer
         // In customize mode, let a plugin add a drop zone for an empty position (no markup in core).
         if ($customize && trim($buffer) === '') {
             $emptyEvent = new GenericEvent('onCustomizeEmptyPosition', ['subject' => $position, 'content' => '']);
-            $app->getDispatcher()->dispatch('onCustomizeEmptyPosition', $emptyEvent);
+            Factory::getContainer()->get(\Joomla\Event\DispatcherInterface::class)->dispatch('onCustomizeEmptyPosition', $emptyEvent);
             $emptyContent = $emptyEvent->getArgument('content');
 
             if (\is_string($emptyContent)) {
