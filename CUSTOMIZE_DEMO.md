@@ -85,12 +85,44 @@ an affordance you cannot use (the per-action save is also checked):
 
 ## How it works
 
-A request only enters customize mode when it carries `customize=1` (`CustomizeMode::isActive()`); it is
-never session-sticky, so normal browsing is unaffected. At each render point, core fires a generic,
-mutable event when the mode is active and uses the returned string; the owning plugin adds all the
-`data-customize-*` markup, so core carries no plugin-specific knowledge. Saves go through `com_ajax`
-(`onAjax<Name>`), each with a CSRF token and a per-item permission check. The admin parent reads the
-same-origin iframe DOM, draws the hover and selection chrome, and drives the edits.
+The whole system runs on one rule: in customize mode core only fires generic, mutable events and uses
+the strings they return, so the `customize` plugins own all the markup, the UI and the persistence.
+End to end:
+
+1. **Launch (backend).** The **Customize** toolbar button opens the admin view
+   `com_menus&view=customize`. It loads the engine and its API, registers the engine's own JS strings,
+   and dispatches `onCustomizeAdminInit` to every `customize` plugin so each registers its admin JS and
+   strings, gated on the permission it needs. The view then renders an iframe at the menu item's live
+   frontend URL with `customize=1` appended.
+
+2. **The frontend marks itself up.** Because the request carries `customize=1`,
+   `CustomizeMode::isActive()` is true (the flag is per-request, never session-sticky, so normal
+   browsing is unaffected). At each render point core fires a generic event and uses the returned
+   string: `onCustomizeRenderView` for every rendered layout (HtmlView), `onCustomizeModule` and
+   `onCustomizeEmptyPosition` for modules and empty positions (ModulesRenderer); translatable text uses
+   a lighter generic collector (an event per `Text::_` call would be too costly) that the language
+   plugin reads on `onAfterRender`. Each owning plugin's PHP listener injects the `data-customize-*`
+   attributes, or, for the view plugin, the comment markers it later turns into blocks. Without the
+   flag the page renders exactly as normal.
+
+3. **The engine wires the page (backend).** The iframe is same-origin, so the admin parent reads its
+   DOM directly. The engine injects the iframe stylesheet, scans for `[data-customize-type]` areas,
+   draws the hover outline and floating toolbar, and wires keyboard access (a roving tabindex). It then
+   emits `customize:frame-ready` so each plugin's admin JS can finish instrumenting, e.g. the view
+   plugin turns its comment markers into wrapped view-blocks and reads the layout hierarchy from the DOM
+   nesting.
+
+4. **Plugins build their UI from the metadata.** Each plugin's admin JS registers its area type(s) and
+   toolbar buttons, then builds the editing affordances from the `data-customize-*` metadata on the
+   hovered or selected area: the article id, the module id, the layout's source file and template, a
+   block's parent and children, and so on. Editing happens in place: inline WYSIWYG, popovers,
+   drag-reorder, or the native template editor opened in a new tab.
+
+5. **Saving (com_ajax).** A save posts to `com_ajax` with `group=customize&plugin=<name>`, which
+   dispatches `onAjax<Name>` to that plugin. The handler verifies the CSRF token and the per-item
+   permission, persists through the native Joomla mechanism (article model, module table, language
+   override, template override), and returns a JSON result the JS uses to update the page in place or
+   reload the iframe.
 
 ## Known limitations
 
