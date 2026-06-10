@@ -40,12 +40,30 @@ another position, or `Delete` to remove it (the keyboard alternative to drag, WC
 `role`, `aria-roledescription`, `aria-keyshortcuts` and an `aria-label`, and a polite live region
 announces what you entered and how to edit it.
 
-## Core changes (small, justified)
+## Core changes
 
-`libraries/src/Customize/CustomizeMode.php` (new runtime), and event hooks in
-`libraries/src/MVC/View/HtmlView.php`, `libraries/src/Document/Renderer/Html/ModulesRenderer.php`,
-`libraries/src/Language/{Language,Text}.php`, plus the `com_menus` customize view and the install/update
-SQL. All hooks are gated by `CustomizeMode::isActive()`, so there is no cost on normal requests.
+The feature touches six core files (about 90 lines of change) plus one self-contained runtime class.
+Every hook is gated by `CustomizeMode::isActive()`, which is false on every normal request, so the only
+always-on cost is a single static flag check (plus `CustomizeMode::detect()` reading one input in
+`initialiseApp`). No existing method signature or behaviour changes: the hooks are additive and inert
+outside customize mode.
+
+- `libraries/src/Customize/CustomizeMode.php` (new, 164 lines): the mode runtime, `detect()` /
+  `isActive()` and the `recordString` / `recordSprintf` collectors. Self-contained.
+- `libraries/src/Application/SiteApplication.php` (+18): `initialiseApp()` calls `CustomizeMode::detect()`
+  and, when active, imports the `customize` plugin group; `render()` appends an invisible
+  `customize-mode:active` marker before `</body>` (guarded by `is_string` and the tag being present).
+  This is where the frontend request enters the mode and loads the plugins.
+- `libraries/src/Document/Renderer/Html/ModulesRenderer.php` (+27): when active, fires `onCustomizeModule`
+  per rendered module and `onCustomizeEmptyPosition` for an empty position, using the returned string.
+  The single module render point; core carries no customize markup.
+- `libraries/src/MVC/View/HtmlView.php` (+28): when active, fires `onCustomizeRenderView` after a
+  sub-layout renders, using the returned string. The single sub-layout render point, same event-only
+  pattern.
+- `libraries/src/Language/Language.php` (+5) and `Text.php` (+11): when active, record the key-to-text
+  (and sprintf result-to-format) mapping through the generic collector. A per-call event on every
+  translated string would be prohibitively expensive, so a passive collector with no plugin logic is the
+  trade-off; the collector also rejects unsuitable text (length, embedded HTML, control chars).
 
 ## Testing
 

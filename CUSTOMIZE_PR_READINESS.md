@@ -69,5 +69,7 @@ Audit date: 2026-06-10.
 - [ ] Real screen-reader pass (VoiceOver / NVDA), only DOM-verified so far.
 - [ ] Document/guard "move a module to a position the template doesn't render" (saves but vanishes
       from the preview; drag has the same behaviour).
-- [ ] Self-review of the core-change footprint (HtmlView event, ModulesRenderer events,
-      CustomizeMode, Language/Text recordString, SiteApplication, com_menus) to minimise/justify.
+- [x] Self-review of the core-change footprint. Done: 6 core files, ~90 lines + the self-contained
+      CustomizeMode runtime; every hook gated by `CustomizeMode::isActive()`, additive and inert
+      otherwise. Per-file justification written into `PR_DESCRIPTION.md` (## Core changes). Base is
+      Joomla 6.1.0 (e35dad1).
