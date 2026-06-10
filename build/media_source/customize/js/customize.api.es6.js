@@ -166,13 +166,24 @@
           menubar: false,
           statusbar: false,
           plugins: 'lists link image autolink',
-          toolbar: 'undo redo | bold italic underline | bullist numlist | link image | removeformat',
-          // The "Image" button's browse control opens the host's Joomla media field (Media Manager).
-          file_picker_types: 'image',
-          file_picker_callback: JoomlaCustomize._mediaPicker,
+          toolbar: 'undo redo | bold italic underline | bullist numlist | link customizeimage | removeformat',
           // Keep URLs as provided (root-relative), so they are not rewritten relative to the iframe's
           // SEF page URL (which would 404). Matches how Joomla stores content image paths.
           convert_urls: false,
+          // A custom "insert image" button that opens the Media Manager directly and inserts at the
+          // cursor. We avoid TinyMCE's own image dialog because its modal backdrop sits over the
+          // Save/Cancel bar, so the bar becomes unclickable while it is open.
+          setup: function (editor) {
+            editor.ui.registry.addButton('customizeimage', {
+              icon: 'image',
+              tooltip: JoomlaCustomize.text('COM_MENUS_CUSTOMIZE_INSERT_IMAGE', 'Insert image'),
+              onAction: function () {
+                JoomlaCustomize._mediaPicker(function (url) {
+                  editor.insertContent('<img src="' + url.replace(/"/g, '%22') + '" alt="">');
+                });
+              }
+            });
+          },
           height: 240
         }).then(function (eds) {
           editor = eds && eds[0];

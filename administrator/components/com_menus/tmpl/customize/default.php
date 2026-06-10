@@ -50,6 +50,7 @@ $this->getDocument()->addScriptOptions('customize', [
 Text::script('COM_MENUS_CUSTOMIZE_SAVE');
 Text::script('COM_MENUS_CUSTOMIZE_CANCEL');
 Text::script('COM_MENUS_CUSTOMIZE_SAVING');
+Text::script('COM_MENUS_CUSTOMIZE_INSERT_IMAGE');
 Text::script('COM_MENUS_CUSTOMIZE_REMOVE');
 Text::script('COM_MENUS_CUSTOMIZE_REMOVE_CONFIRM');
 Text::script('COM_MENUS_CUSTOMIZE_REMOVE_HINT');
