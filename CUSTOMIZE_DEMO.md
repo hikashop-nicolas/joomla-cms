@@ -38,9 +38,8 @@ and re-run `npm run build`. Existing sites get the five plugins enabled through 
 
 ## The editing flow
 
-- The host loads the menu item's live frontend page in a same-origin iframe. The right panel shows a
-  status (green when customize mode is active, with the editable-area count) and, for users who can
-  manage modules, an **Add module** button.
+- The host loads the menu item's live frontend page in a same-origin iframe. The right panel offers,
+  for users who can manage modules, an **Add module** button.
 - Hover or Tab to an editable area: it outlines and shows a small toolbar with the actions available
   for that area.
 - Click **Edit** (or press Enter) to edit in place. Article and custom-module bodies open a WYSIWYG
@@ -59,15 +58,20 @@ and re-run `npm run build`. Existing sites get the five plugins enabled through 
 
   ![Editing a translated string in place, saved as a language override](docs/customize-demo/03-language-edit.png)
 
+- Open any layout block (a view sub-layout or a module's own layout, at any nesting depth) and click
+  **Edit layout** to create its template override and open Joomla's native template editor. The
+  toolbar's **Parent** and **Children** controls walk the block's hierarchy, so a deeply nested layout
+  is reachable without hunting for it on the page.
+
 ## What you can edit
 
 | Plugin | What it edits | Persists as |
 |---|---|---|
 | content | Article text, title, image, category | Article model save |
-| module | Module settings, custom-module HTML, menu-item rename/reorder/delete | Module table / menu items |
+| module | Module settings, custom-module HTML, menu-item rename/reorder/delete; the module's layout override | Module table, menu items, template override |
 | position | Module placement: reorder, move position, add, remove | Module table |
 | language | Any translated string on the page | Language override |
-| view | A layout's template override, and reorder of safe blocks | Template override |
+| view | A view layout's template override, at any nesting level; parent/child block navigation | Template override |
 
 ## Permissions
 
@@ -92,10 +96,11 @@ same-origin iframe DOM, draws the hover and selection chrome, and drives the edi
 
 - **Same-origin by design.** If the site frontend is served from a different origin than the
   administrator (an uncommon setup), the browser blocks iframe access; customize mode detects this and
-  shows a clear status rather than failing. Cross-origin support would need a postMessage agent in the
-  frontend, which is out of scope.
-- Block reorder is offered only where the rendered output maps reliably to the layout source;
-  otherwise the view plugin offers **Edit layout** but not drag.
+  skips instrumentation rather than failing noisily. Cross-origin support would need a postMessage
+  agent in the frontend, which is out of scope.
+- A layout block is made editable only when its rendered output is a safely wrappable range; a block
+  whose markup cannot be wrapped safely (for example a fragment that spans sibling table rows) is
+  skipped rather than risking the page layout.
 
 ## Feedback
 
