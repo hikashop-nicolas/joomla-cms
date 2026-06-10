@@ -10,14 +10,7 @@
  * @copyright   (C) 2026 Open Source Matters, Inc. <https://www.joomla.org>
  * @license     GNU General Public License version 2 or later; see LICENSE.txt
  */
-(function (window) {
-  'use strict';
-
-  var JC = window.JoomlaCustomize;
-
-  if (!JC) {
-    return;
-  }
+import JC from 'customize.api';
 
   function t(key, fallback) {
     return JC.text(key, fallback);
@@ -166,4 +159,3 @@
 
   JC.registerAreaType('view-block', { label: t('PLG_CUSTOMIZE_VIEW_AREA', 'Layout block') });
   JC.registerButton('view-block', { id: 'advanced', label: t('PLG_CUSTOMIZE_VIEW_BTN_EDIT', 'Edit layout'), order: 90, onClick: openLayoutEditor });
-}(window));

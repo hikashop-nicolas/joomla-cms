@@ -7,14 +7,7 @@
  * @copyright   (C) 2026 Open Source Matters, Inc. <https://www.joomla.org>
  * @license     GNU General Public License version 2 or later; see LICENSE.txt
  */
-(function (window) {
-  'use strict';
-
-  var JC = window.JoomlaCustomize;
-
-  if (!JC) {
-    return;
-  }
+import JC from 'customize.api';
 
   function t(key, fallback) {
     return JC.text(key, fallback);
@@ -335,4 +328,3 @@
 
   JC.registerButton('menuitem', { id: 'edit', label: t('PLG_CUSTOMIZE_MODULE_BTN_EDIT', 'Edit'), order: 10, onClick: editMenuItemName });
   JC.registerButton('menuitem', { id: 'advanced', label: t('PLG_CUSTOMIZE_MODULE_BTN_ADVANCED', 'Advanced'), order: 90, onClick: openMenuItemEditor });
-}(window));

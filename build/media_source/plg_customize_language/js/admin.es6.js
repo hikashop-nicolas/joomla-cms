@@ -12,14 +12,7 @@
  * @copyright   (C) 2026 Open Source Matters, Inc. <https://www.joomla.org>
  * @license     GNU General Public License version 2 or later; see LICENSE.txt
  */
-(function (window) {
-  'use strict';
-
-  var JC = window.JoomlaCustomize;
-
-  if (!JC) {
-    return;
-  }
+import JC from 'customize.api';
 
   function t(key, fallback) {
     return JC.text(key, fallback);
@@ -432,4 +425,3 @@
 
   JC.registerAreaType('lang', { label: t('PLG_CUSTOMIZE_LANGUAGE_AREA', 'Text') });
   JC.registerButton('lang', { id: 'edit', label: t('PLG_CUSTOMIZE_LANGUAGE_BTN_EDIT', 'Edit'), order: 10, onClick: editLang });
-}(window));

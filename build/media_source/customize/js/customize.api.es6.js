@@ -1,19 +1,12 @@
 /**
  * Joomla Customize - public extension API.
  *
- * Loaded in the admin Customize host page. Customize plugins call window.JoomlaCustomize to register
- * area types and per-type buttons, and to call back into PHP through com_ajax (group=customize).
+ * The default export is the JoomlaCustomize API; the engine and customize plugins import it. It is
+ * also assigned to window.JoomlaCustomize as a convenience global (and for debugging).
  *
  * @copyright   (C) 2026 Open Source Matters, Inc. <https://www.joomla.org>
  * @license     GNU General Public License version 2 or later; see LICENSE.txt
  */
-(function (window) {
-  'use strict';
-
-  if (window.JoomlaCustomize) {
-    return;
-  }
-
   var bus = new EventTarget();
   var areaTypes = {};
   var buttons = {};
@@ -329,4 +322,5 @@
   };
 
   window.JoomlaCustomize = JoomlaCustomize;
-}(window));
+
+export default JoomlaCustomize;

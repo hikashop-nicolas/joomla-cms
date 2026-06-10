@@ -40,7 +40,14 @@ Audit date: 2026-06-10.
       extracted and unit-tested (no traversal possible); the language override writer and a broader
       pass still want review.
 - [ ] Cross-origin / postMessage fallback, or document the same-origin-only limitation in the PR.
-- [ ] ES modules: maintainers may want `.es6.js` modules instead of the current `.es5.js` IIFEs.
+- [x] ES modules. Done. The engine + plugins are `.es6.js` ES modules: `customize.api` exports the API
+      (default export, registered `importmap: true`) and the engine (`customize.engine`) + the 5
+      plugins are `type="module"` that import it by bare specifier (`import JC from 'customize.api'`).
+      Built through the standard rollup/babel pipeline (`handleESMFile`); `customize.api` was added to
+      the build's `externalModules` so it stays one shared module rather than being bundled into each
+      consumer. Engine + all plugins load, register, and a `callAction` round-trip works; eslint clean.
+      (The engine source is `customize.engine.es6.js`, renamed off `*core.es6.js` which the build
+      special-cases to an IIFE.)
 - [~] Documentation: PR description + manual test steps drafted in `PR_DESCRIPTION.md`. User docs
       (manual.joomla.org) still to write.
 

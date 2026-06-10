@@ -8,11 +8,9 @@
  * @copyright   (C) 2026 Open Source Matters, Inc. <https://www.joomla.org>
  * @license     GNU General Public License version 2 or later; see LICENSE.txt
  */
-(function (window, document) {
-  'use strict';
+import JC from 'customize.api';
 
-  document.addEventListener('DOMContentLoaded', function () {
-    var JC = window.JoomlaCustomize;
+document.addEventListener('DOMContentLoaded', function () {
     var opts = (window.Joomla && window.Joomla.getOptions) ? (window.Joomla.getOptions('customize') || {}) : {};
     var frame = document.getElementById(opts.frameId || 'customize-frame');
     var statusEl = document.getElementById('customize-status');
@@ -980,4 +978,3 @@
       editing = false;
     });
   });
-}(window, document));

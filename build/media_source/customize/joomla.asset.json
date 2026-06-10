@@ -14,22 +14,21 @@
       "name": "customize.api",
       "type": "script",
       "uri": "customize/customize.api.min.js",
+      "importmap": true,
       "dependencies": [
         "core"
-      ],
-      "attributes": {
-        "defer": true
-      }
+      ]
     },
     {
-      "name": "customize.core",
+      "name": "customize.engine",
       "type": "script",
-      "uri": "customize/customize.core.min.js",
+      "uri": "customize/customize.engine.min.js",
       "dependencies": [
+        "core",
         "customize.api"
       ],
       "attributes": {
-        "defer": true
+        "type": "module"
       }
     }
   ]

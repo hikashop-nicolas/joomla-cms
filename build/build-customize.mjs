@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import recursive from 'recursive-readdir';
 
 import { handleES5File } from './build-modules-js/javascript/handle-es5.mjs';
+import { handleESMFile } from './build-modules-js/javascript/compile-to-es2017.mjs';
 import { handleCssFile } from './build-modules-js/stylesheets/handle-css.mjs';
 
 const sourceRoot = join(dirname(fileURLToPath(import.meta.url)), 'media_source');
@@ -31,7 +32,9 @@ for (const folder of folders) {
   const files = await recursive(join(sourceRoot, folder));
 
   for (const file of files) {
-    if (file.endsWith('.es5.js')) {
+    if (file.endsWith('.es6.js')) {
+      await handleESMFile(file);
+    } else if (file.endsWith('.es5.js')) {
       await handleES5File(file);
     } else if (file.endsWith('.css') && !file.endsWith('.min.css')) {
       await handleCssFile(file);

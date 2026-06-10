@@ -64,5 +64,10 @@ Unit tests: `tests/Unit/Libraries/Cms/Customize` and `tests/Unit/Plugin/Customiz
 
 - **Same-origin only.** If the site frontend is on a different origin from the admin, the engine cannot
   read the iframe; a postMessage fallback is not yet implemented (a status message is shown).
-- The engine/plugin assets are registered by path for now; by-name WebAsset manifest registration is
-  prepared but pending (see the checklist).
+
+## Assets
+
+The engine and plugins are ES modules built through the standard pipeline and registered by name from
+WebAsset manifests. `customize.api` is the shared API module (`importmap: true`); the engine and the
+five plugins are `type="module"` and import it by bare specifier, so it loads once and they share its
+registries.

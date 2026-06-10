@@ -23,10 +23,11 @@ use Joomla\CMS\Uri\Uri;
 $wa = $this->getDocument()->getWebAssetManager();
 
 // Register the engine assets from their WebAsset manifest (media/customize/joomla.asset.json) and use
-// them by name; "core" depends on "api" in the manifest, so both scripts load.
+// them by name. The engine is an ES module that imports the customize.api module (declared
+// importmap:true), so the manager adds the api to the page import map.
 $wa->getRegistry()->addExtensionRegistryFile('customize');
 $wa->useStyle('customize.style')
-    ->useScript('customize.core');
+    ->useScript('customize.engine');
 
 // Let each active customize plugin contribute its admin-side JS via its own manifest.
 foreach (PluginHelper::getPlugin('customize') as $plugin) {

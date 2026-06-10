@@ -29,6 +29,7 @@ const getExternalModules = async () => {
     'editor-decorator',
     'sa11y',
     'sa11y-lang',
+    'customize.api',
   );
 
   // Codemirror modules

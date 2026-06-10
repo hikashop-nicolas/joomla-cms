@@ -9,14 +9,7 @@
  * @copyright   (C) 2026 Open Source Matters, Inc. <https://www.joomla.org>
  * @license     GNU General Public License version 2 or later; see LICENSE.txt
  */
-(function (window) {
-  'use strict';
-
-  var JC = window.JoomlaCustomize;
-
-  if (!JC) {
-    return;
-  }
+import JC from 'customize.api';
 
   function t(key, fallback) {
     return JC.text(key, fallback);
@@ -442,4 +435,3 @@
   ['content', 'content-title', 'content-image', 'content-props'].forEach(function (type) {
     JC.registerButton(type, { id: 'advanced', label: advancedLabel, order: 90, onClick: openArticleEditor });
   });
-}(window));
