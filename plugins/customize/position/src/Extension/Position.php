@@ -255,6 +255,10 @@ final class Position extends CMSPlugin implements SubscriberInterface
      */
     private function doModuleTypes(): string
     {
+        if (!$this->canManageModules()) {
+            return $this->fail(Text::_('JERROR_ALERTNOAUTHOR'));
+        }
+
         $db = Factory::getContainer()->get(DatabaseInterface::class);
 
         $query = $db->createQuery()
@@ -371,6 +375,10 @@ final class Position extends CMSPlugin implements SubscriberInterface
      */
     private function doPositions(): string
     {
+        if (!$this->canManageModules()) {
+            return $this->fail(Text::_('JERROR_ALERTNOAUTHOR'));
+        }
+
         return json_encode(['success' => true, 'positions' => $this->templatePositions()]);
     }
 
@@ -448,5 +456,20 @@ final class Position extends CMSPlugin implements SubscriberInterface
     private function fail(string $message): string
     {
         return json_encode(['success' => false, 'message' => $message]);
+    }
+
+    /**
+     * Whether the current user may manage site modules. Gates the read-only pickers
+     * (module types, template positions), which the mutating actions back with per-item checks.
+     *
+     * @return  boolean
+     *
+     * @since   1.0.0
+     */
+    private function canManageModules(): bool
+    {
+        $identity = $this->getApplication()->getIdentity();
+
+        return $identity->authorise('core.edit', 'com_modules') || $identity->authorise('core.create', 'com_modules');
     }
 }
