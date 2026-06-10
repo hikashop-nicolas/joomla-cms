@@ -39,8 +39,9 @@ Audit date: 2026-06-10.
       removed. The blocker was the manifest URIs including `js/`/`css/`: `HTMLHelper mediaPath` inserts
       that folder itself, so they resolved to `media/customize/js/js/...` (missing) and the resolved
       URI was empty, so the document skipped them. Fixed by using `<extension>/<file>` URIs. Engine +
-      all 5 plugins verified loading via the manifests. (Still drop the local-only
-      `build/build-customize.mjs` for the PR; the standard build compiles `build/media_source`.)
+      all 5 plugins verified loading via the manifests. The dev-only `build/build-customize.mjs` is now
+      untracked (kept locally for the dev loop); the standard build (`compilejs.mjs` crawls
+      `build/media_source` and routes `.es6.js` through `handleESMFile`) compiles the customize assets.
 - [x] **PHP code standards.** `php-cs-fixer` clean and `phpstan` clean (0 errors). The deprecation
       notices were resolved: dropped `CMSPlugin::setDispatcher()` from the 5 providers, replaced
       `Table::getInstance()` with a direct `new Joomla\CMS\Table\Module($db)` and removed the
