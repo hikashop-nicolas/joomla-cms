@@ -7,25 +7,25 @@
 
 .customize-host {
   display: flex;
-  gap: 0;
   height: calc(100vh - 130px);
   min-height: 420px;
-  border: 1px solid var(--template-bg-dark, #dee2e6);
-  border-radius: 0.25rem;
   overflow: hidden;
+  border: 1px solid var(--template-bg-dark, #dee2e6);
+  border-radius: .25rem;
+  gap: 0;
 }
 
 .customize-stage {
-  flex: 1 1 auto;
   position: relative;
+  flex: 1 1 auto;
   background: #fff;
 }
 
 .customize-frame {
+  display: block;
   width: 100%;
   height: 100%;
   border: 0;
-  display: block;
 }
 
 .customize-empty {
@@ -34,56 +34,30 @@
 }
 
 .customize-panel {
-  flex: 0 0 280px;
-  border-left: 1px solid var(--template-bg-dark, #dee2e6);
-  background: var(--template-bg-light, #f8f9fa);
-  padding: 1rem;
   display: flex;
+  flex: 0 0 280px;
   flex-direction: column;
-  gap: 0.75rem;
+  padding: 1rem;
   overflow-y: auto;
-}
-
-.customize-status {
-  font-size: 0.875rem;
-  line-height: 1.4;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.25rem;
-  background: #fff;
-  border: 1px solid #dee2e6;
-}
-
-/* No status set yet (before the first frame load): keep the panel clean. */
-.customize-status:empty {
-  display: none;
-}
-
-.customize-status.is-ok {
-  border-color: #198754;
-  color: #0f5132;
-  background: #d1e7dd;
-}
-
-.customize-status.is-warn {
-  border-color: #ffc107;
-  color: #664d03;
-  background: #fff3cd;
+  background: var(--template-bg-light, #f8f9fa);
+  border-left: 1px solid var(--template-bg-dark, #dee2e6);
+  gap: .75rem;
 }
 
 .customize-add-form {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  padding: 0.75rem;
+  padding: .75rem;
+  color: #212529;
   background: #fff;
   border: 1px solid #dee2e6;
-  border-radius: 0.25rem;
-  color: #212529;
+  border-radius: .25rem;
+  gap: .35rem;
 }
 
 .customize-add-form label {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: .8125rem;
   font-weight: 600;
   color: #212529;
 }
@@ -95,30 +69,30 @@
 
 .customize-add-bar {
   padding: 5px 10px;
-  background: #2a7de1;
-  color: #fff;
-  font-size: 0.8125rem;
+  overflow: hidden;
+  font-size: .8125rem;
   font-weight: 600;
-  border-radius: 3px;
+  color: #fff;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   cursor: move;
   user-select: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  background: #2a7de1;
+  border-radius: 3px;
 }
 
 .customize-add-bar.is-dragging {
-  opacity: 0.5;
+  opacity: .5;
 }
 
 .customize-add-hint {
-  font-size: 0.75rem;
+  font-size: .75rem;
   color: #6c757d;
 }
 
 .customize-add-actions {
   display: flex;
-  gap: 0.5rem;
+  gap: .5rem;
 }
 
 .customize-hidden {

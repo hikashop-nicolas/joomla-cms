@@ -21,8 +21,8 @@
   position: absolute;
   width: 1px;
   height: 1px;
-  margin: -1px;
   padding: 0;
+  margin: -1px;
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
@@ -32,38 +32,38 @@
 .customize-toolbar {
   position: absolute;
   z-index: 99999;
-  transform: translateY(-100%);
   display: flex;
   align-items: stretch;
-  gap: 0.25rem;
   max-width: 90vw;
   padding: 0;
   font: 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  background: #2a7de1;
   color: #fff;
+  background: #2a7de1;
   border-radius: 3px 3px 0 0;
-  box-shadow: 0 -1px 4px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 -1px 4px rgba(0, 0, 0, .2);
+  transform: translateY(-100%);
+  gap: .25rem;
 }
 
 .customize-toolbar-label {
   display: flex;
   align-items: center;
   padding: 4px 8px;
-  font-weight: 600;
-  white-space: nowrap;
   overflow: hidden;
+  font-weight: 600;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .customize-toolbar-cue {
-  margin-left: 6px;
   padding: 0 6px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.25);
+  margin-left: 6px;
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: .04em;
+  background: rgba(255, 255, 255, .25);
+  border-radius: 8px;
 }
 
 .customize-toolbar-actions {
@@ -76,20 +76,20 @@
 }
 
 .customize-btn {
-  appearance: none;
-  border: 0;
-  border-left: 1px solid rgba(255, 255, 255, 0.3);
-  background: transparent;
-  color: #fff;
   padding: 4px 10px;
   font: inherit;
-  cursor: pointer;
+  color: #fff;
   white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-left: 1px solid rgba(255, 255, 255, .3);
+  appearance: none;
 }
 
 .customize-btn:hover,
 .customize-btn:focus {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, .18);
   outline: none;
 }
 
@@ -103,12 +103,12 @@
 }
 
 .customize-action {
-  border: 0;
-  border-radius: 3px;
   padding: 4px 12px;
   font: 13px sans-serif;
   color: #fff;
   cursor: pointer;
+  border: 0;
+  border-radius: 3px;
 }
 
 .customize-action-save {
@@ -121,16 +121,16 @@
 
 .customize-toast {
   position: fixed;
-  left: 50%;
   bottom: 16px;
-  transform: translateX(-50%);
+  left: 50%;
   z-index: 100001;
   padding: 8px 14px;
-  border-radius: 4px;
   font: 13px sans-serif;
-  background: #212529;
   color: #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  background: #212529;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .3);
+  transform: translateX(-50%);
 }
 
 .customize-popover {
@@ -138,19 +138,19 @@
   z-index: 100000;
   width: 260px;
   padding: 10px 12px;
+  font: 13px sans-serif;
+  color: #212529;
+  background: #fff;
   border: 1px solid #2a7de1;
   border-radius: 4px;
-  font: 13px sans-serif;
-  background: #fff;
-  color: #212529;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .25);
 }
 
 .customize-popover select,
 .customize-popover input[type="text"] {
+  box-sizing: border-box;
   width: 100%;
   margin: 2px 0 4px;
-  box-sizing: border-box;
 }
 
 .customize-field-label {
@@ -160,8 +160,8 @@
 
 .customize-hint {
   margin: 2px 0 6px;
-  color: #6c757d;
   font-size: 11px;
+  color: #6c757d;
 }
 
 .customize-check {
@@ -172,14 +172,14 @@
 }
 
 .customize-link {
-  margin: 0 0 6px;
   padding: 0;
-  border: 0;
-  background: none;
-  color: #2a7de1;
+  margin: 0 0 6px;
   font: 12px sans-serif;
+  color: #2a7de1;
   text-decoration: underline;
   cursor: pointer;
+  background: none;
+  border: 0;
 }
 
 .customize-editor {
@@ -196,7 +196,7 @@
 }
 
 .customize-dragging {
-  opacity: 0.4;
+  opacity: .4;
 }
 
 /* Every valid drop target while a drag is in progress (pale blue dashed). */
@@ -215,13 +215,13 @@
    Hidden until a drag begins (the position plugin flags the body). */
 .customize-empty-position {
   display: none;
-  margin: 4px 0;
   padding: 14px;
+  margin: 4px 0;
+  font: 12px sans-serif;
+  color: #6c9fe0;
+  text-align: center;
   border: 2px dashed #9ec5f0;
   border-radius: 3px;
-  color: #6c9fe0;
-  font: 12px sans-serif;
-  text-align: center;
 }
 
 .customize-empty-position.customize-dropzone-active {
@@ -231,16 +231,16 @@
 /* Sticky "move to another position" zone shown at the bottom while dragging a module. */
 .customize-sticky-zone {
   position: fixed;
-  left: 0;
   right: 0;
   bottom: 0;
+  left: 0;
   z-index: 100002;
   padding: 12px 16px;
-  background: #2a7de1;
-  color: #fff;
   font: 13px sans-serif;
+  color: #fff;
   text-align: center;
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.2);
+  background: #2a7de1;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, .2);
 }
 
 .customize-sticky-zone.customize-sticky-over {
@@ -262,7 +262,7 @@
 .customize-sticky-zone-top {
   top: 0;
   bottom: auto;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .2);
 }
 
 .customize-sticky-danger {
@@ -275,16 +275,16 @@
 
 /* The confirm button sits on the red bar, so invert it: white with red text. */
 .customize-action-danger {
-  background: #fff;
-  color: #dc3545;
   font-weight: 600;
+  color: #dc3545;
+  background: #fff;
 }
 
 /* A module greyed out in place while its new position is being chosen. */
 .customize-pending {
-  opacity: 0.4;
   outline: 2px dashed #9ec5f0;
   outline-offset: -2px;
+  opacity: .4;
 }
 
 /* A freshly added module, highlighted until it is dragged into place. */
@@ -295,12 +295,12 @@
 
 .customize-image-placeholder {
   display: inline-block;
-  margin: 0 0 8px;
   padding: 6px 10px;
+  margin: 0 0 8px;
+  font: 12px sans-serif;
+  color: #2a7de1;
   border: 1px dashed #2a7de1;
   border-radius: 3px;
-  color: #2a7de1;
-  font: 12px sans-serif;
 }
 
 /* In-place name editing (e.g. a menu item): hide the original, show a real text input. */

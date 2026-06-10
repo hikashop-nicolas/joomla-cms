@@ -13,7 +13,6 @@ import JC from 'customize.api';
 document.addEventListener('DOMContentLoaded', function () {
     var opts = (window.Joomla && window.Joomla.getOptions) ? (window.Joomla.getOptions('customize') || {}) : {};
     var frame = document.getElementById(opts.frameId || 'customize-frame');
-    var statusEl = document.getElementById('customize-status');
 
     if (!frame || !JC) {
       return;
@@ -34,14 +33,6 @@ document.addEventListener('DOMContentLoaded', function () {
     var externalDrag = null;
     var removeBar = null;
     var pendingDelete = null;
-
-    function setStatus(text, ok) {
-      if (statusEl) {
-        statusEl.textContent = text;
-        statusEl.classList.toggle('is-ok', !!ok);
-        statusEl.classList.toggle('is-warn', !ok);
-      }
-    }
 
     function frameDoc() {
       try {
@@ -542,7 +533,6 @@ document.addEventListener('DOMContentLoaded', function () {
       carryCustomize(doc);
 
       var areas = doc.querySelectorAll('[data-customize-type]');
-      setStatus(JC.text('COM_MENUS_CUSTOMIZE_STATUS_ACTIVE', 'Customize mode active · %s editable area(s)').replace('%s', areas.length), true);
 
       var win = doc.defaultView;
       var hideTimer = null;
@@ -952,11 +942,9 @@ document.addEventListener('DOMContentLoaded', function () {
       var doc = frameDoc();
 
       if (!doc) {
-        // The browser blocks reading the iframe when the frontend is served from a different origin
-        // than the administrator. Customize drives the page through direct same-origin DOM access by
-        // design, so those (uncommon) setups are not editable; surface a clear status instead of
-        // failing silently. Cross-origin support would require a postMessage agent in the frontend.
-        setStatus(JC.text('COM_MENUS_CUSTOMIZE_STATUS_CROSS_ORIGIN', 'Live editing is unavailable: the site frontend is on a different origin from the administrator.'), false);
+        // The browser blocks reading the iframe when the frontend is on a different origin from the
+        // administrator (uncommon). Customize edits through direct same-origin DOM access, so such
+        // setups are not editable; bail rather than instrument an unreadable frame.
         return;
       }
 
@@ -964,7 +952,6 @@ document.addEventListener('DOMContentLoaded', function () {
         || (frame.contentWindow && frame.contentWindow.JoomlaCustomizeFrame);
 
       if (!active) {
-        setStatus(JC.text('COM_MENUS_CUSTOMIZE_STATUS_INACTIVE', 'Frontend loaded, but customize mode is not active on the page.'), false);
         return;
       }
 

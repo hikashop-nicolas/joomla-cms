@@ -50,9 +50,6 @@ Text::script('COM_MENUS_CUSTOMIZE_INSERT_IMAGE');
 Text::script('COM_MENUS_CUSTOMIZE_REMOVE');
 Text::script('COM_MENUS_CUSTOMIZE_REMOVE_CONFIRM');
 Text::script('COM_MENUS_CUSTOMIZE_REMOVE_HINT');
-Text::script('COM_MENUS_CUSTOMIZE_STATUS_ACTIVE');
-Text::script('COM_MENUS_CUSTOMIZE_STATUS_CROSS_ORIGIN');
-Text::script('COM_MENUS_CUSTOMIZE_STATUS_INACTIVE');
 Text::script('COM_MENUS_CUSTOMIZE_AREA_ROLEDESCRIPTION');
 Text::script('COM_MENUS_CUSTOMIZE_AREA_HINT');
 Text::script('COM_MENUS_CUSTOMIZE_AREA_MOVE_HINT');
@@ -78,7 +75,6 @@ Factory::getContainer()->get(DispatcherInterface::class)
     </div>
     <aside class="customize-panel">
         <?php if ($this->previewUrl) : ?>
-            <div id="customize-status" class="customize-status" role="status"></div>
             <a class="customize-open-external btn btn-outline-secondary btn-sm"
                 href="<?php echo htmlspecialchars($this->previewUrl, ENT_QUOTES); ?>"
                 target="_blank" rel="noopener"><?php echo Text::_('COM_MENUS_CUSTOMIZE_OPEN_FRONTEND'); ?></a>
