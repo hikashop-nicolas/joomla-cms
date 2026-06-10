@@ -272,7 +272,19 @@ final class View extends CMSPlugin implements SubscriberInterface
      */
     public function onCustomizeAdminInit(): void
     {
+        // Template overrides require core.admin; otherwise the view editing UI is not loaded at all.
+        if (!$this->getApplication()->getIdentity()->authorise('core.admin')) {
+            return;
+        }
+
         $this->loadLanguage();
+
+        $wa = $this->getApplication()->getDocument()->getWebAssetManager();
+
+        if (is_file(JPATH_ROOT . '/media/plg_customize_view/joomla.asset.json')) {
+            $wa->getRegistry()->addExtensionRegistryFile('plg_customize_view');
+            $wa->useScript('plg_customize_view.admin');
+        }
 
         foreach (
             [

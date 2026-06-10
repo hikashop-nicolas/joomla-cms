@@ -30,13 +30,8 @@ $wa->getRegistry()->addExtensionRegistryFile('customize');
 $wa->useStyle('customize.style')
     ->useScript('customize.engine');
 
-// Let each active customize plugin contribute its admin-side JS via its own manifest.
-foreach (PluginHelper::getPlugin('customize') as $plugin) {
-    if (is_file(JPATH_ROOT . '/media/plg_customize_' . $plugin->name . '/joomla.asset.json')) {
-        $wa->getRegistry()->addExtensionRegistryFile('plg_customize_' . $plugin->name);
-        $wa->useScript('plg_customize_' . $plugin->name . '.admin');
-    }
-}
+// Each customize plugin registers its own admin-side JS in onCustomizeAdminInit (dispatched below),
+// gated on the permission needed to use it, so editing UI the user cannot use is never loaded.
 
 $this->getDocument()->addScriptOptions('customize', [
     'ajaxBase' => 'index.php?option=com_ajax&group=customize&format=json',

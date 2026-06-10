@@ -297,7 +297,27 @@ final class Module extends CMSPlugin implements SubscriberInterface
      */
     public function onCustomizeAdminInit(): void
     {
+        $identity     = $this->getApplication()->getIdentity();
+        $canModules   = $identity->authorise('core.edit', 'com_modules');
+        $canMenuItems = $identity->authorise('core.edit', 'com_menus');
+
+        // The plugin instruments modules (com_modules) and menu items (com_menus) as separate areas;
+        // load nothing unless the user can edit at least one, and tell the JS which areas to enable.
+        if (!$canModules && !$canMenuItems) {
+            return;
+        }
+
         $this->loadLanguage();
+
+        $document = $this->getApplication()->getDocument();
+        $document->addScriptOptions('customize.module', ['modules' => $canModules, 'menus' => $canMenuItems]);
+
+        $wa = $document->getWebAssetManager();
+
+        if (is_file(JPATH_ROOT . '/media/plg_customize_module/joomla.asset.json')) {
+            $wa->getRegistry()->addExtensionRegistryFile('plg_customize_module');
+            $wa->useScript('plg_customize_module.admin');
+        }
 
         $keys = [
             'PLG_CUSTOMIZE_MODULE_AREA',

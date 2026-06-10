@@ -79,7 +79,21 @@ final class Content extends CMSPlugin implements SubscriberInterface
      */
     public function onCustomizeAdminInit(): void
     {
+        $identity = $this->getApplication()->getIdentity();
+
+        // Article editing requires content-edit rights; otherwise the content editing UI is not loaded.
+        if (!$identity->authorise('core.edit', 'com_content') && !$identity->authorise('core.edit.own', 'com_content')) {
+            return;
+        }
+
         $this->loadLanguage();
+
+        $wa = $this->getApplication()->getDocument()->getWebAssetManager();
+
+        if (is_file(JPATH_ROOT . '/media/plg_customize_content/joomla.asset.json')) {
+            $wa->getRegistry()->addExtensionRegistryFile('plg_customize_content');
+            $wa->useScript('plg_customize_content.admin');
+        }
 
         $keys = [
             'PLG_CUSTOMIZE_CONTENT_ADD_IMAGE',

@@ -197,7 +197,19 @@ final class LanguageEditor extends CMSPlugin implements SubscriberInterface
      */
     public function onCustomizeAdminInit(): void
     {
+        // Language overrides require core.admin; otherwise the language editing UI is not loaded.
+        if (!$this->getApplication()->getIdentity()->authorise('core.admin')) {
+            return;
+        }
+
         $this->loadLanguage();
+
+        $wa = $this->getApplication()->getDocument()->getWebAssetManager();
+
+        if (is_file(JPATH_ROOT . '/media/plg_customize_language/joomla.asset.json')) {
+            $wa->getRegistry()->addExtensionRegistryFile('plg_customize_language');
+            $wa->useScript('plg_customize_language.admin');
+        }
 
         foreach (
             [

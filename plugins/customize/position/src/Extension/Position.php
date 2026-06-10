@@ -417,7 +417,19 @@ final class Position extends CMSPlugin implements SubscriberInterface
      */
     public function onCustomizeAdminInit(): void
     {
+        // Module placement needs module-management rights; otherwise the position UI is not loaded.
+        if (!$this->canManageModules()) {
+            return;
+        }
+
         $this->loadLanguage();
+
+        $wa = $this->getApplication()->getDocument()->getWebAssetManager();
+
+        if (is_file(JPATH_ROOT . '/media/plg_customize_position/joomla.asset.json')) {
+            $wa->getRegistry()->addExtensionRegistryFile('plg_customize_position');
+            $wa->useScript('plg_customize_position.admin');
+        }
 
         foreach (
             [
