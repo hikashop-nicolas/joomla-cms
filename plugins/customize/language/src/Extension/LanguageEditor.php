@@ -130,21 +130,17 @@ final class LanguageEditor extends CMSPlugin implements SubscriberInterface
         }
 
         $payload = json_decode($this->getApplication()->getInput()->get('payload', '', 'raw'), true) ?: [];
-        $key     = strtoupper(trim((string) ($payload['key'] ?? '')));
+        $key     = self::sanitizeKey((string) ($payload['key'] ?? ''));
         $value   = (string) ($payload['value'] ?? '');
 
-        if ($key === '' || !preg_match('/^[A-Z0-9_]+$/', $key)) {
+        if ($key === null) {
             $event->addResult($this->fail(Text::_('PLG_CUSTOMIZE_LANGUAGE_ERROR_INVALID')));
 
             return;
         }
 
         // Target the default site language.
-        $tag = (string) ComponentHelper::getParams('com_languages')->get('site', 'en-GB');
-
-        if (!preg_match('/^[A-Za-z]{2,3}(-[A-Za-z]{2,4})?$/', $tag)) {
-            $tag = 'en-GB';
-        }
+        $tag = self::safeLanguageTag((string) ComponentHelper::getParams('com_languages')->get('site', 'en-GB'));
 
         $file    = JPATH_SITE . '/language/overrides/' . $tag . '.override.ini';
         $strings = is_file($file) ? LanguageHelper::parseIniFile($file) : [];
@@ -158,6 +154,38 @@ final class LanguageEditor extends CMSPlugin implements SubscriberInterface
         }
 
         $event->addResult(json_encode(['success' => true]));
+    }
+
+    /**
+     * Validate and normalise a language override key. Override keys are upper-case INI-style
+     * identifiers, so anything else (including INI-breaking or path characters) is rejected.
+     *
+     * @param   string  $raw  The raw key from the request.
+     *
+     * @return  string|null  The normalised key, or null when it is not a valid identifier.
+     *
+     * @since   1.0.0
+     */
+    private static function sanitizeKey(string $raw): ?string
+    {
+        $key = strtoupper(trim($raw));
+
+        return ($key !== '' && preg_match('/^[A-Z0-9_]+$/', $key)) ? $key : null;
+    }
+
+    /**
+     * Constrain a language tag to the expected xx / xx-YY shape, falling back to en-GB, so the tag
+     * (used to build the override file path) can never carry a path separator.
+     *
+     * @param   string  $tag  The configured site language tag.
+     *
+     * @return  string  A safe language tag.
+     *
+     * @since   1.0.0
+     */
+    private static function safeLanguageTag(string $tag): string
+    {
+        return preg_match('/^[A-Za-z]{2,3}(-[A-Za-z]{2,4})?$/', $tag) ? $tag : 'en-GB';
     }
 
     /**

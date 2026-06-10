@@ -16,12 +16,14 @@ Audit date: 2026-06-10.
 - Keyboard + ARIA + live-region announcements implemented (DOM-verified).
 
 ## Hard blockers
-- [~] **Tests.** 21 unit tests passing: `CustomizeModeTest` (runtime: detect/isActive, recordString
-      + isRecordable, recordSprintf); the event-handler tests for the module, position and view
-      plugins (markup injection, drop zone, block wrapping); and the view override path sanitizer
-      (extracted as `View::sanitizeOverrideRequest`, tested for correct paths, path-traversal
-      stripping, and rejection of missing segments). Still need tests for the rest of the plugins'
-      *ajax* actions (harder: static Session::checkToken + db + filesystem) and system/Cypress tests.
+- [~] **Tests.** 30 unit tests passing: `CustomizeModeTest` (runtime: detect/isActive, recordString
+      + isRecordable, recordSprintf); render-time event-handler tests for the module, position, view
+      and content plugins (module markup, drop zone, view-block markers, article-text wrapping with
+      active/inactive/context/idempotency cases); and pure-logic security tests for the view override
+      path sanitizer (`View::sanitizeOverrideRequest`) and the language override key/tag validators
+      (`LanguageEditor::sanitizeKey` / `safeLanguageTag`). The remaining ajax actions that mutate the
+      db / write files are integration-level (static `Session::checkToken` + model + filesystem) and
+      belong in system/Cypress tests, still to add.
 - [x] **Update SQL.** Done. Idempotent `INSERT ... WHERE NOT EXISTS` for the 5 plugins in
       `administrator/components/com_admin/sql/updates/{mysql,postgresql}/6.2.0-2026-06-10.sql`
       (targeting 6.2.0; validated on the test DB: applies clean, stays at 5 rows).
