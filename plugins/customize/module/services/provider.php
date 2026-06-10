@@ -15,7 +15,6 @@ use Joomla\CMS\Factory;
 use Joomla\CMS\Plugin\PluginHelper;
 use Joomla\DI\Container;
 use Joomla\DI\ServiceProviderInterface;
-use Joomla\Event\DispatcherInterface;
 use Joomla\Plugin\Customize\Module\Extension\Module;
 
 return new class () implements ServiceProviderInterface {
@@ -36,7 +35,6 @@ return new class () implements ServiceProviderInterface {
                 $plugin = new Module(
                     (array) PluginHelper::getPlugin('customize', 'module')
                 );
-                $plugin->setDispatcher($container->get(DispatcherInterface::class));
                 $plugin->setApplication(Factory::getApplication());
 
                 return $plugin;

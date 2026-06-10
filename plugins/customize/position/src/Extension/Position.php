@@ -16,7 +16,7 @@ use Joomla\CMS\Factory;
 use Joomla\CMS\Language\Text;
 use Joomla\CMS\Plugin\CMSPlugin;
 use Joomla\CMS\Session\Session;
-use Joomla\CMS\Table\Table;
+use Joomla\CMS\Table\Module;
 use Joomla\Component\Templates\Administrator\Helper\TemplatesHelper;
 use Joomla\Database\DatabaseInterface;
 use Joomla\Database\ParameterType;
@@ -231,13 +231,12 @@ final class Position extends CMSPlugin implements SubscriberInterface
             return $this->fail(Text::_('PLG_CUSTOMIZE_POSITION_ERROR_INVALID'));
         }
 
-        $table = Table::getInstance('Module', '\\Joomla\\CMS\\Table\\');
-
-        if (!$table || !$table->delete($id)) {
-            return $this->fail(($table ? $table->getError() : '') ?: Text::_('PLG_CUSTOMIZE_POSITION_DELETE_FAILED'));
-        }
-
         $db    = Factory::getContainer()->get(DatabaseInterface::class);
+        $table = new Module($db);
+
+        if (!$table->delete($id)) {
+            return $this->fail(Text::_('PLG_CUSTOMIZE_POSITION_DELETE_FAILED'));
+        }
         $query = $db->createQuery()
             ->delete($db->quoteName('#__modules_menu'))
             ->where($db->quoteName('moduleid') . ' = :id')
@@ -337,11 +336,7 @@ final class Position extends CMSPlugin implements SubscriberInterface
         $db->setQuery($maxQuery);
         $ordering = (int) $db->loadResult() + 1;
 
-        $table = Table::getInstance('Module', '\\Joomla\\CMS\\Table\\');
-
-        if (!$table) {
-            return $this->fail(Text::_('PLG_CUSTOMIZE_POSITION_ADD_FAILED'));
-        }
+        $table = new Module($db);
 
         $table->title     = $title;
         $table->module    = $module;
@@ -357,7 +352,7 @@ final class Position extends CMSPlugin implements SubscriberInterface
         $table->content   = '';
 
         if (!$table->check() || !$table->store()) {
-            return $this->fail($table->getError() ?: Text::_('PLG_CUSTOMIZE_POSITION_ADD_FAILED'));
+            return $this->fail(Text::_('PLG_CUSTOMIZE_POSITION_ADD_FAILED'));
         }
 
         // Assign to all pages (menuid 0). insertObject takes the row by reference.

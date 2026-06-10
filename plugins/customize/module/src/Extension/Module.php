@@ -85,7 +85,7 @@ final class Module extends CMSPlugin implements SubscriberInterface
             ->createTable('Menu', 'Administrator');
 
         if (!$table || !$table->load($id) || !$table->moveByReference($reference, $position, $id)) {
-            return $this->fail(($table ? $table->getError() : '') ?: Text::_('PLG_CUSTOMIZE_MODULE_ERROR_SAVE'));
+            return $this->fail(Text::_('PLG_CUSTOMIZE_MODULE_ERROR_SAVE'));
         }
 
         return json_encode(['success' => true]);
@@ -142,7 +142,7 @@ final class Module extends CMSPlugin implements SubscriberInterface
             ->createTable('Menu', 'Administrator');
 
         if (!$table || !$table->delete($id)) {
-            return $this->fail(($table ? $table->getError() : '') ?: Text::_('PLG_CUSTOMIZE_MODULE_ERROR_SAVE'));
+            return $this->fail(Text::_('PLG_CUSTOMIZE_MODULE_ERROR_SAVE'));
         }
 
         return json_encode(['success' => true]);
@@ -253,7 +253,7 @@ final class Module extends CMSPlugin implements SubscriberInterface
                 $table->published = (int) ($payload['published'] ?? $table->published);
 
                 if ($table->title === '' || !$table->store()) {
-                    $event->addResult($this->fail($table->getError() ?: Text::_('PLG_CUSTOMIZE_MODULE_ERROR_SAVE')));
+                    $event->addResult($this->fail(Text::_('PLG_CUSTOMIZE_MODULE_ERROR_SAVE')));
 
                     return;
                 }

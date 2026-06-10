@@ -12,7 +12,6 @@ namespace Joomla\Tests\Unit\Plugin\Customize\View\Extension;
 
 use Joomla\CMS\Application\CMSApplication;
 use Joomla\CMS\Event\GenericEvent;
-use Joomla\Event\Dispatcher;
 use Joomla\Plugin\Customize\View\Extension\View;
 use Joomla\Tests\Unit\UnitTestCase;
 
@@ -46,7 +45,7 @@ class ViewTest extends UnitTestCase
             ->getMockForAbstractClass();
         $app->method('getTemplate')->willReturn($template);
 
-        $plugin = new View(new Dispatcher(), ['params' => []]);
+        $plugin = new View(['params' => []]);
         $plugin->setApplication($app);
 
         return $plugin;
@@ -117,7 +116,6 @@ class ViewTest extends UnitTestCase
     private function sanitize(array $payload)
     {
         $method = new \ReflectionMethod(View::class, 'sanitizeOverrideRequest');
-        $method->setAccessible(true);
 
         return $method->invoke(null, $payload);
     }

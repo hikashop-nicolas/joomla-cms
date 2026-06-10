@@ -11,7 +11,6 @@
 namespace Joomla\Tests\Unit\Plugin\Customize\Module\Extension;
 
 use Joomla\CMS\Event\GenericEvent;
-use Joomla\Event\Dispatcher;
 use Joomla\Plugin\Customize\Module\Extension\Module;
 use Joomla\Tests\Unit\UnitTestCase;
 
@@ -36,7 +35,7 @@ class ModuleTest extends UnitTestCase
      */
     private function plugin(): Module
     {
-        return new Module(new Dispatcher(), ['params' => []]);
+        return new Module(['params' => []]);
     }
 
     /**

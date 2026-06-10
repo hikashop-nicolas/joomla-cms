@@ -15,6 +15,7 @@ use Joomla\CMS\Language\Text;
 use Joomla\CMS\Plugin\PluginHelper;
 use Joomla\CMS\Session\Session;
 use Joomla\CMS\Uri\Uri;
+use Joomla\Event\DispatcherInterface;
 
 // phpcs:disable PSR1.Files.SideEffects
 \defined('_JEXEC') or die;
@@ -67,7 +68,8 @@ Text::script('COM_MENUS_CUSTOMIZE_AREA_DELETE_HINT');
 // Let customize plugins register their own JS strings and admin assets.
 $app = Factory::getApplication();
 PluginHelper::importPlugin('customize');
-$app->getDispatcher()->dispatch('onCustomizeAdminInit', new GenericEvent('onCustomizeAdminInit', ['subject' => $app]));
+Factory::getContainer()->get(DispatcherInterface::class)
+    ->dispatch('onCustomizeAdminInit', new GenericEvent('onCustomizeAdminInit', ['subject' => $app]));
 ?>
 <div class="customize-host">
     <div class="customize-stage">

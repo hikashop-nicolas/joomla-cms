@@ -41,7 +41,12 @@ Audit date: 2026-06-10.
       URI was empty, so the document skipped them. Fixed by using `<extension>/<file>` URIs. Engine +
       all 5 plugins verified loading via the manifests. (Still drop the local-only
       `build/build-customize.mjs` for the PR; the standard build compiles `build/media_source`.)
-- [~] **PHP code standards.** Installing composer dev deps to run `php-cs-fixer` + `phpunit`.
+- [x] **PHP code standards.** `php-cs-fixer` clean and `phpstan` clean (0 errors). The deprecation
+      notices were resolved: dropped `CMSPlugin::setDispatcher()` from the 5 providers, replaced
+      `Table::getInstance()` with a direct `new Joomla\CMS\Table\Module($db)` and removed the
+      deprecated `getError()` calls (the generic message was already the fallback), and dispatch
+      `onCustomizeAdminInit` via the container's `DispatcherInterface` instead of the deprecated
+      `EventAwareInterface::getDispatcher()`. Plugins, ajax actions and the dispatch verified working.
 
 ## Likely required by reviewers
 - [~] Dedicated security review of the file-writing handlers. The view override path resolver is now

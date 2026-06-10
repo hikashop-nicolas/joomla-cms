@@ -259,7 +259,7 @@ final class Content extends CMSPlugin implements SubscriberInterface
         }
 
         if (!$model->save(['id' => (int) $record->id, 'catid' => (int) $record->catid, $field => $value])) {
-            return $this->fail($model->getError() ?: Text::_('PLG_CUSTOMIZE_CONTENT_ERROR_SAVE'));
+            return $this->fail(Text::_('PLG_CUSTOMIZE_CONTENT_ERROR_SAVE'));
         }
 
         return json_encode(['success' => true, 'id' => (int) $record->id, 'field' => $field, 'html' => $value]);
@@ -308,7 +308,7 @@ final class Content extends CMSPlugin implements SubscriberInterface
         ];
 
         if (!$model->save($data)) {
-            return $this->fail($model->getError() ?: Text::_('PLG_CUSTOMIZE_CONTENT_ERROR_SAVE'));
+            return $this->fail(Text::_('PLG_CUSTOMIZE_CONTENT_ERROR_SAVE'));
         }
 
         return json_encode(['success' => true] + $data);
@@ -334,7 +334,7 @@ final class Content extends CMSPlugin implements SubscriberInterface
         $images[$target] = $url;
 
         if (!$model->save(['id' => (int) $record->id, 'catid' => (int) $record->catid, 'images' => $images])) {
-            return $this->fail($model->getError() ?: Text::_('PLG_CUSTOMIZE_CONTENT_ERROR_SAVE'));
+            return $this->fail(Text::_('PLG_CUSTOMIZE_CONTENT_ERROR_SAVE'));
         }
 
         return json_encode(['success' => true, 'target' => $target, 'url' => $url]);
@@ -378,7 +378,7 @@ final class Content extends CMSPlugin implements SubscriberInterface
         ]);
 
         if (!$saved) {
-            return $this->fail($categoryModel->getError() ?: Text::_('PLG_CUSTOMIZE_CONTENT_ERROR_SAVE'));
+            return $this->fail(Text::_('PLG_CUSTOMIZE_CONTENT_ERROR_SAVE'));
         }
 
         $catid = (int) $categoryModel->getState('category.id');
@@ -395,7 +395,7 @@ final class Content extends CMSPlugin implements SubscriberInterface
         ];
 
         if (!$model->save($data)) {
-            return $this->fail($model->getError() ?: Text::_('PLG_CUSTOMIZE_CONTENT_ERROR_SAVE'));
+            return $this->fail(Text::_('PLG_CUSTOMIZE_CONTENT_ERROR_SAVE'));
         }
 
         return json_encode(['success' => true, 'catid' => $catid, 'name' => $name]);

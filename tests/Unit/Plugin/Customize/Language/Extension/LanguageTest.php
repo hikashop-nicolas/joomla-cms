@@ -38,7 +38,6 @@ class LanguageTest extends UnitTestCase
     private function call(string $method, string $arg)
     {
         $reflection = new \ReflectionMethod(LanguageEditor::class, $method);
-        $reflection->setAccessible(true);
 
         return $reflection->invoke(null, $arg);
     }

@@ -11,7 +11,6 @@
 namespace Joomla\Tests\Unit\Plugin\Customize\Position\Extension;
 
 use Joomla\CMS\Event\GenericEvent;
-use Joomla\Event\Dispatcher;
 use Joomla\Plugin\Customize\Position\Extension\Position;
 use Joomla\Tests\Unit\UnitTestCase;
 
@@ -38,7 +37,7 @@ class PositionTest extends UnitTestCase
     {
         $event = new GenericEvent('onCustomizeEmptyPosition', ['subject' => 'sidebar-a', 'content' => '']);
 
-        (new Position(new Dispatcher(), ['params' => []]))->onCustomizeEmptyPosition($event);
+        (new Position(['params' => []]))->onCustomizeEmptyPosition($event);
 
         $html = (string) $event->getArgument('content');
 
@@ -59,7 +58,7 @@ class PositionTest extends UnitTestCase
     {
         $event = new GenericEvent('onCustomizeEmptyPosition', ['subject' => 'a"b', 'content' => '']);
 
-        (new Position(new Dispatcher(), ['params' => []]))->onCustomizeEmptyPosition($event);
+        (new Position(['params' => []]))->onCustomizeEmptyPosition($event);
 
         $this->assertStringContainsString('data-customize-droppos="a&quot;b"', (string) $event->getArgument('content'));
     }

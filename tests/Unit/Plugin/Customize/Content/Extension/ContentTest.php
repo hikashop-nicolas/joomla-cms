@@ -13,7 +13,6 @@ namespace Joomla\Tests\Unit\Plugin\Customize\Content\Extension;
 use Joomla\CMS\Application\CMSApplicationInterface;
 use Joomla\CMS\Customize\CustomizeMode;
 use Joomla\CMS\Event\Content\ContentPrepareEvent;
-use Joomla\Event\Dispatcher;
 use Joomla\Input\Input;
 use Joomla\Plugin\Customize\Content\Extension\Content;
 use Joomla\Registry\Registry;
@@ -69,7 +68,7 @@ class ContentTest extends UnitTestCase
      */
     private function plugin(): Content
     {
-        return new Content(new Dispatcher(), ['params' => []]);
+        return new Content(['params' => []]);
     }
 
     /**
