@@ -44,7 +44,8 @@ Audit date: 2026-06-10.
       pass still want review.
 - [ ] Cross-origin / postMessage fallback, or document the same-origin-only limitation in the PR.
 - [ ] ES modules: maintainers may want `.es6.js` modules instead of the current `.es5.js` IIFEs.
-- [ ] Documentation: PR description + manual test steps + user docs.
+- [~] Documentation: PR description + manual test steps drafted in `PR_DESCRIPTION.md`. User docs
+      (manual.joomla.org) still to write.
 
 ## Polish
 - [ ] Real screen-reader pass (VoiceOver / NVDA), only DOM-verified so far.
