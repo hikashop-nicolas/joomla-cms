@@ -8,12 +8,12 @@
     {
       "name": "customize.style",
       "type": "style",
-      "uri": "customize/css/customize.min.css"
+      "uri": "customize/customize.min.css"
     },
     {
       "name": "customize.api",
       "type": "script",
-      "uri": "customize/js/customize.api.min.js",
+      "uri": "customize/customize.api.min.js",
       "dependencies": [
         "core"
       ],
@@ -24,7 +24,7 @@
     {
       "name": "customize.core",
       "type": "script",
-      "uri": "customize/js/customize.core.min.js",
+      "uri": "customize/customize.core.min.js",
       "dependencies": [
         "customize.api"
       ],

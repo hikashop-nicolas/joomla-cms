@@ -8,7 +8,7 @@
     {
       "name": "plg_customize_content.admin",
       "type": "script",
-      "uri": "plg_customize_content/js/admin.min.js",
+      "uri": "plg_customize_content/admin.min.js",
       "dependencies": [
         "customize.api"
       ],

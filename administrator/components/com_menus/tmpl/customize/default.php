@@ -22,27 +22,17 @@ use Joomla\CMS\Uri\Uri;
 
 $wa = $this->getDocument()->getWebAssetManager();
 
-// The engine + plugins ship WebAsset manifests (media/customize/joomla.asset.json and
-// media/plg_customize_*/joomla.asset.json, names "customize.*" / "plg_customize_*.admin"). The
-// eventual upstream form is to register them by name via addExtensionRegistryFile() + useScript(),
-// but in this view that registers the assets (assetExists() is true) without ever rendering them, so
-// the explicit path-based registration is kept for now (see CUSTOMIZE_PR_READINESS.md).
-$wa->registerAndUseStyle('com_menus.customize', 'media/customize/css/customize.css');
-$wa->registerAndUseScript('com_menus.customize.api', 'media/customize/js/customize.api.js', [], ['defer' => true]);
-$wa->registerAndUseScript('com_menus.customize.core', 'media/customize/js/customize.core.js', [], ['defer' => true], ['com_menus.customize.api']);
+// Register the engine assets from their WebAsset manifest (media/customize/joomla.asset.json) and use
+// them by name; "core" depends on "api" in the manifest, so both scripts load.
+$wa->getRegistry()->addExtensionRegistryFile('customize');
+$wa->useStyle('customize.style')
+    ->useScript('customize.core');
 
-// Let each active customize plugin contribute its admin-side JS (area types, buttons, handlers).
+// Let each active customize plugin contribute its admin-side JS via its own manifest.
 foreach (PluginHelper::getPlugin('customize') as $plugin) {
-    $script = 'media/plg_customize_' . $plugin->name . '/js/admin.js';
-
-    if (is_file(JPATH_ROOT . '/' . $script)) {
-        $wa->registerAndUseScript(
-            'com_menus.customize.plugin.' . $plugin->name,
-            $script,
-            [],
-            ['defer' => true],
-            ['com_menus.customize.api']
-        );
+    if (is_file(JPATH_ROOT . '/media/plg_customize_' . $plugin->name . '/joomla.asset.json')) {
+        $wa->getRegistry()->addExtensionRegistryFile('plg_customize_' . $plugin->name);
+        $wa->useScript('plg_customize_' . $plugin->name . '.admin');
     }
 }
 
