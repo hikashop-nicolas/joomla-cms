@@ -25,9 +25,11 @@ Audit date: 2026-06-10.
       (`tests/System/integration/administrator/components/com_menus/Customize.cy.js`): it logs into
       the admin, opens the customize host for the home menu item, and asserts the host renders
       (toolbar title + preview iframe), the engine ES module loads (`window.JoomlaCustomize`), and the
-      module plugin's buttons registered (proving the import-map wiring resolves at runtime).
-      Run-verified against the local clone (passing). Further Cypress coverage of the individual edit
-      actions could be added, but the core flow is now covered.
+      module plugin's buttons registered (proving the import-map wiring resolves at runtime). A second
+      test makes a real inline content edit through the engine API (`callAction('content', 'save')`)
+      and asserts the new text persisted in the article's introtext in the database. Both run-verified
+      against the local clone (passing). More edit-action coverage (drag reorder, override creation)
+      could follow the same pattern.
 - [x] **Update SQL.** Done. Idempotent `INSERT ... WHERE NOT EXISTS` for the 5 plugins in
       `administrator/components/com_admin/sql/updates/{mysql,postgresql}/6.2.0-2026-06-10.sql`
       (targeting 6.2.0; validated on the test DB: applies clean, stays at 5 rows).

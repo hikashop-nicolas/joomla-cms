@@ -59,8 +59,8 @@ SQL. All hooks are gated by `CustomizeMode::isActive()`, so there is no cost on 
    editor opens.
 
 Unit tests: `tests/Unit/Libraries/Cms/Customize` and `tests/Unit/Plugin/Customize/**`. System test:
-`tests/System/integration/administrator/components/com_menus/Customize.cy.js` (opens the host and
-checks the engine + plugins load).
+`tests/System/integration/administrator/components/com_menus/Customize.cy.js` (opens the host, checks
+the engine + plugins load, and makes a content edit through the engine API that is verified in the db).
 
 ## Known limitations
 

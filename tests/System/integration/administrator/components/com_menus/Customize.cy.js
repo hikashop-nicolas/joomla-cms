@@ -22,4 +22,38 @@ describe('Test that the com_menus Customize host', () => {
           .should('have.length.greaterThan', 0);
       });
   });
+
+  it('persists an inline content edit made through the engine API', () => {
+    const marker = 'Edited by the Customize system test';
+    let articleId;
+
+    // A content area edit, end to end: the engine calls the content plugin's save action over
+    // com_ajax, which saves through the article model. (The article is removed by cleanupDB.)
+    cy.db_createArticle({ title: 'Customize system test article', introtext: '<p>Original intro</p>' })
+      .then((article) => {
+        articleId = article.id;
+      });
+
+    cy.task('queryDB', "SELECT id FROM #__menu WHERE home = 1 AND client_id = 0 AND published = 1 LIMIT 1")
+      .then((rows) => {
+        cy.visit(`administrator/index.php?option=com_menus&view=customize&id=${rows[0].id}`);
+      });
+
+    cy.window().its('JoomlaCustomize').should('exist');
+
+    cy.window()
+      .then((win) => win.JoomlaCustomize.callAction('content', 'save', {
+        id: articleId,
+        field: 'introtext',
+        html: `<p>${marker}</p>`,
+      }))
+      .then((res) => {
+        expect(res).to.have.property('success', true);
+
+        return cy.task('queryDB', `SELECT introtext FROM #__content WHERE id = ${articleId}`);
+      })
+      .then((rows) => {
+        expect(rows[0].introtext).to.contain(marker);
+      });
+  });
 });
