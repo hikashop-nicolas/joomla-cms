@@ -11,8 +11,6 @@ menu items; module placement; any translated string; and a layout's template ove
 normal authorised save that persists through native Joomla mechanisms (the article model, the module
 table, language overrides, template overrides).
 
-![Customize host: the live frontend in an iframe with the status panel](docs/customize-demo/01-overview.png)
-
 ## Try it
 
 This is a fork of joomla-cms (base: Joomla 6.1.0). It is a core source tree, not an installable
@@ -45,17 +43,21 @@ and re-run `npm run build`. Existing sites get the five plugins enabled through 
   manage modules, an **Add module** button.
 - Hover or Tab to an editable area: it outlines and shows a small toolbar with the actions available
   for that area.
-
-  ![An editable area outlined with its toolbar](docs/customize-demo/02-toolbar.png)
-
 - Click **Edit** (or press Enter) to edit in place. Article and custom-module bodies open a WYSIWYG
   editor with image support; titles and translated strings edit inline; module and menu-item settings
   open a small popover.
 
-  ![Editing an article body in place](docs/customize-demo/03-edit.png)
+  ![Editing an article body in place with the inline editor](docs/customize-demo/01-content-edit.png)
 
 - Drag a module to reorder it or move it to another position, or use Ctrl with the arrow keys; press
   Delete to remove it. Drag works for menu items in a menu module too.
+
+  ![Dragging a module to reorder it, with the drop zone highlighted](docs/customize-demo/02-module-reorder.png)
+
+- Edit any translated string on the page (a label, a button, the "Written by" line). It saves as a
+  Joomla language override that applies site-wide.
+
+  ![Editing a translated string in place, saved as a language override](docs/customize-demo/03-language-edit.png)
 
 ## What you can edit
 
