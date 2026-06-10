@@ -143,6 +143,25 @@ import JC from 'customize.api';
     window.open('index.php?option=com_modules&task=module.edit&id=' + encodeURIComponent(ctx.data.id), '_blank', 'noopener');
   }
 
+  // Create (if needed) and open the override of this module's own layout file, reusing the view
+  // plugin's shared override action.
+  function openModuleLayoutEditor(ctx) {
+    JC.callAction('view', 'override', {
+      component: ctx.data.module,
+      view: '',
+      source: ctx.data.source,
+      template: ctx.data.template
+    }).then(function (res) {
+      if (res && res.success && res.url) {
+        window.open(res.url, '_blank', 'noopener');
+      } else {
+        JC.ui.toast(ctx.doc, (res && res.message) || t('PLG_CUSTOMIZE_MODULE_UNKNOWN_ERROR', 'unknown error'));
+      }
+    }).catch(function () {
+      JC.ui.toast(ctx.doc, t('PLG_CUSTOMIZE_MODULE_SAVE_ERROR', 'Save error.'));
+    });
+  }
+
   // The PHP side reports which areas the user may edit: modules (com_modules) and/or menu items
   // (com_menus). Only register the area type the user is permitted to use.
   var perms = (window.Joomla && window.Joomla.getOptions) ? (window.Joomla.getOptions('customize.module', {}) || {}) : {};
@@ -152,6 +171,12 @@ import JC from 'customize.api';
     JC.registerButton('module', { id: 'edit', label: t('PLG_CUSTOMIZE_MODULE_BTN_EDIT', 'Edit'), order: 10, onClick: editModule });
     // Only shown on custom modules (data-customize-custom emitted by the renderer).
     JC.registerButton('module', { id: 'content', label: t('PLG_CUSTOMIZE_MODULE_BTN_CONTENT', 'Edit content'), order: 20, requires: 'custom', onClick: editContent });
+
+    // Layout override needs core.admin, and only shows when the module's layout file was resolved.
+    if (perms.overrides) {
+      JC.registerButton('module', { id: 'layout', label: t('PLG_CUSTOMIZE_MODULE_BTN_LAYOUT', 'Edit layout'), order: 80, requires: 'source', onClick: openModuleLayoutEditor });
+    }
+
     JC.registerButton('module', { id: 'advanced', label: t('PLG_CUSTOMIZE_MODULE_BTN_ADVANCED', 'Advanced'), order: 90, onClick: openModuleEditor });
   }
 

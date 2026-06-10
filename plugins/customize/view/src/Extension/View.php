@@ -230,17 +230,18 @@ final class View extends CMSPlugin implements SubscriberInterface
         $view      = preg_replace('/[^a-zA-Z0-9_]/', '', (string) ($payload['view'] ?? ''));
         $template  = preg_replace('/[^a-zA-Z0-9_\-]/', '', (string) ($payload['template'] ?? ''));
 
-        // The source is the sub-layout file core actually rendered, resolved via the view's own template
-        // paths and carried in the block marker. Constrain it to a real .php file under the site's
-        // components/ tree with no traversal, so it can only ever be a component layout we copy into a
-        // template override. The override itself always lands at the Joomla convention for this
-        // component/view, named after that source file, which is where the component's view reads it.
-        $source = ltrim(str_replace('\\', '/', (string) ($payload['source'] ?? '')), '/');
+        // The source is the layout file core actually rendered, carried in the marker: a component view
+        // layout under components/, or a module layout under modules/. Constrain it to a real .php file
+        // with no traversal, so it can only ever be a layout we copy into a template override.
+        $source          = ltrim(str_replace('\\', '/', (string) ($payload['source'] ?? '')), '/');
+        $underComponents = strpos($source, 'components/') === 0;
+        $underModules    = strpos($source, 'modules/') === 0;
 
         if (
-            $component === '' || $view === '' || $source === ''
+            $component === '' || $source === ''
             || strpos($source, '..') !== false
-            || strpos($source, 'components/') !== 0
+            || (!$underComponents && !$underModules)
+            || ($underComponents && $view === '')
             || substr($source, -4) !== '.php'
             || !is_file(JPATH_SITE . '/' . $source)
         ) {
@@ -249,13 +250,19 @@ final class View extends CMSPlugin implements SubscriberInterface
 
         $fileName = basename($source);
 
+        // Component views nest the override under the view name; modules (no view) sit directly under
+        // the module folder, matching Joomla's override conventions.
+        $relPath = $underModules
+            ? '/html/' . $component . '/' . $fileName
+            : '/html/' . $component . '/' . $view . '/' . $fileName;
+
         return [
             'component' => $component,
             'view'      => $view,
             'template'  => $template,
             'fileName'  => $fileName,
             'source'    => $source,
-            'relPath'   => '/html/' . $component . '/' . $view . '/' . $fileName,
+            'relPath'   => $relPath,
         ];
     }
 
@@ -314,7 +321,9 @@ final class View extends CMSPlugin implements SubscriberInterface
             [
                 'PLG_CUSTOMIZE_VIEW_AREA',
                 'PLG_CUSTOMIZE_VIEW_BTN_EDIT',
+                'PLG_CUSTOMIZE_VIEW_CHILDREN',
                 'PLG_CUSTOMIZE_VIEW_OVERRIDDEN',
+                'PLG_CUSTOMIZE_VIEW_PARENT',
                 'PLG_CUSTOMIZE_VIEW_SAVED',
                 'PLG_CUSTOMIZE_VIEW_SAVE_ERROR',
                 'PLG_CUSTOMIZE_VIEW_SAVE_FAILED',

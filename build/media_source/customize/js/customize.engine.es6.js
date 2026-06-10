@@ -436,6 +436,10 @@ document.addEventListener('DOMContentLoaded', function () {
           event.preventDefault();
           event.stopPropagation();
 
+          // Pin before running the handler so a button can re-select another area (e.g. navigate to a
+          // parent or child layout); cleared by a click elsewhere.
+          pinned = el;
+
           if (typeof button.onClick === 'function') {
             button.onClick({
               el: el,
@@ -447,9 +451,6 @@ document.addEventListener('DOMContentLoaded', function () {
               emit: JC.emit
             });
           }
-
-          // Keep this element selected while the user works with it (cleared by a click elsewhere).
-          pinned = el;
         });
         actions.appendChild(btn);
       });
@@ -461,6 +462,15 @@ document.addEventListener('DOMContentLoaded', function () {
       toolbar.style.display = 'flex';
       positionFor(el, doc);
     }
+
+    // Programmatically select an area (outline + toolbar) and pin it, so a toolbar button can navigate
+    // to another area, e.g. the view plugin's parent/child layout controls.
+    JC.select = function (el) {
+      if (el && el.getAttribute && el.getAttribute('data-customize-type')) {
+        showFor(el, el.ownerDocument);
+        pinned = el;
+      }
+    };
 
     // Run an element's primary (first applicable) button action, and select it. Shared by
     // double-click and the keyboard Enter/Space activation.

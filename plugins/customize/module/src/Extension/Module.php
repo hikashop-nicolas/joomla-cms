@@ -20,6 +20,7 @@ use Joomla\CMS\Session\Session;
 use Joomla\Database\DatabaseInterface;
 use Joomla\Database\ParameterType;
 use Joomla\Event\SubscriberInterface;
+use Joomla\Registry\Registry;
 
 // phpcs:disable PSR1.Files.SideEffects
 \defined('_JEXEC') or die;
@@ -180,8 +181,51 @@ final class Module extends CMSPlugin implements SubscriberInterface
             $attrs .= ' data-customize-custom="1"';
         }
 
+        // Add the module's own layout file so "Edit layout" can override it.
+        $attrs .= $this->layoutAttributes($module);
+
         // Inject into the module's first tag (no extra wrapper).
         $event->setArgument('output', preg_replace('/^(\s*<[a-zA-Z][^>]*?)(\s*\/?>)/', '$1' . $attrs . '$2', $html, 1));
+    }
+
+    /**
+     * Build the data-customize-* attributes that let "Edit layout" target this module's own layout
+     * override (templates/<tpl>/html/<module>/<layout>.php). Empty when the layout cannot be resolved.
+     *
+     * @param   object  $module  The module record.
+     *
+     * @return  string
+     *
+     * @since   1.0.0
+     */
+    private function layoutAttributes($module): string
+    {
+        $moduleName = (string) ($module->module ?? '');
+
+        if ($moduleName === '') {
+            return '';
+        }
+
+        $layout = (new Registry($module->params ?? ''))->get('layout', 'default') ?: 'default';
+
+        // A 'tpl:layout' param points at a template-provided layout; the base name is after the ':'.
+        if (strpos($layout, ':') !== false) {
+            $layout = substr($layout, strpos($layout, ':') + 1) ?: 'default';
+        }
+
+        $layout = preg_replace('/[^a-zA-Z0-9_]/', '', $layout);
+        $source = 'modules/' . $moduleName . '/tmpl/' . $layout . '.php';
+
+        if (!is_file(JPATH_SITE . '/' . $source)) {
+            return '';
+        }
+
+        $template     = (string) $this->getApplication()->getTemplate();
+        $overrideFile = JPATH_SITE . '/templates/' . $template . '/html/' . $moduleName . '/' . $layout . '.php';
+
+        return ' data-customize-source="' . htmlspecialchars($source, ENT_QUOTES) . '"'
+            . ' data-customize-template="' . htmlspecialchars($template, ENT_QUOTES) . '"'
+            . ' data-customize-override="' . (is_file($overrideFile) ? '1' : '0') . '"';
     }
 
     /**
@@ -300,6 +344,7 @@ final class Module extends CMSPlugin implements SubscriberInterface
         $identity     = $this->getApplication()->getIdentity();
         $canModules   = $identity->authorise('core.edit', 'com_modules');
         $canMenuItems = $identity->authorise('core.edit', 'com_menus');
+        $canOverride  = $identity->authorise('core.admin');
 
         // The plugin instruments modules (com_modules) and menu items (com_menus) as separate areas;
         // load nothing unless the user can edit at least one, and tell the JS which areas to enable.
@@ -310,7 +355,7 @@ final class Module extends CMSPlugin implements SubscriberInterface
         $this->loadLanguage();
 
         $document = $this->getApplication()->getDocument();
-        $document->addScriptOptions('customize.module', ['modules' => $canModules, 'menus' => $canMenuItems]);
+        $document->addScriptOptions('customize.module', ['modules' => $canModules, 'menus' => $canMenuItems, 'overrides' => $canOverride]);
 
         $wa = $document->getWebAssetManager();
 
@@ -324,6 +369,7 @@ final class Module extends CMSPlugin implements SubscriberInterface
             'PLG_CUSTOMIZE_MODULE_BTN_ADVANCED',
             'PLG_CUSTOMIZE_MODULE_BTN_CONTENT',
             'PLG_CUSTOMIZE_MODULE_BTN_EDIT',
+            'PLG_CUSTOMIZE_MODULE_BTN_LAYOUT',
             'PLG_CUSTOMIZE_MODULE_CONTENT_SAVED',
             'PLG_CUSTOMIZE_MODULE_CONTENT_TOO_LARGE',
             'PLG_CUSTOMIZE_MODULE_LOAD_FAILED',

@@ -153,6 +153,27 @@
   margin: 2px 0 4px;
 }
 
+/* A clickable item in a popover menu (e.g. the view plugin's child-layout list); dark on the white
+   popover, unlike the toolbar's .customize-btn which is light on the dark toolbar. */
+.customize-menu-item {
+  display: block;
+  width: 100%;
+  padding: 4px 8px;
+  font: inherit;
+  color: #212529;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 3px;
+}
+
+.customize-menu-item:hover,
+.customize-menu-item:focus {
+  background: rgba(42, 125, 225, .12);
+  outline: none;
+}
+
 .customize-field-label {
   margin-top: 6px;
   font-weight: 600;

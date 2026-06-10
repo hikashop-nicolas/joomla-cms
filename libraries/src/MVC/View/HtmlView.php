@@ -414,6 +414,11 @@ class HtmlView extends AbstractView implements CurrentUserInterface
             // which overwrites $this->_template, so reading it after the include would be the wrong file.
             $renderedTemplate = $this->_template;
 
+            // Customize mode: the id identifies this layout for the hook below; it is the sub-layout
+            // name when given, otherwise the layout (covers the top-level view, setLayout() and
+            // loadTemplate('x')).
+            $customizeId = $customizeBlock ?? $layout;
+
             // Unset so as not to introduce into template scope
             unset($tpl, $file);
 
@@ -433,12 +438,11 @@ class HtmlView extends AbstractView implements CurrentUserInterface
             // clear it.
             $this->_output = ob_get_clean();
 
-            // Customize mode: fire a hook so the customize "view" plugin can instrument this
-            // sub-layout's output. Core only dispatches the event and uses the returned string; it
-            // holds no knowledge of the customize markup itself.
+            // Customize mode: fire a hook so the customize "view" plugin can instrument every rendered
+            // layout (the top-level view layout and each sub-layout). Core only dispatches the event and
+            // uses the returned string; it holds no knowledge of the customize markup itself.
             if (
-                $customizeBlock !== null
-                && \Joomla\CMS\Customize\CustomizeMode::isActive()
+                \Joomla\CMS\Customize\CustomizeMode::isActive()
                 && Factory::getApplication()->getDocument()->getType() === 'html'
             ) {
                 $app   = Factory::getApplication();
@@ -448,7 +452,7 @@ class HtmlView extends AbstractView implements CurrentUserInterface
                     'component' => $app->getInput()->getCmd('option', ''),
                     'view'      => $this->getName(),
                     'layout'    => $layout,
-                    'block'     => $customizeBlock,
+                    'block'     => $customizeId,
                     'file'      => $renderedTemplate,
                 ]);
                 Factory::getContainer()->get(\Joomla\Event\DispatcherInterface::class)->dispatch('onCustomizeRenderView', $event);
