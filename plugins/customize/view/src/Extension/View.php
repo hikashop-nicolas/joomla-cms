@@ -88,6 +88,19 @@ final class View extends CMSPlugin implements SubscriberInterface
         $component = (string) $event->getArgument('component', '');
         $view      = (string) $event->getArgument('view', '');
         $layout    = (string) $event->getArgument('layout', '');
+        $file      = (string) $event->getArgument('file', '');
+
+        // Resolve the block to the actual sub-layout file core rendered. Core found it via the view's
+        // own registered template paths (Path::find on _path['template']), so this works for any
+        // component, not only the core tmpl/<view>/ convention (e.g. HikaShop, under views/<view>/tmpl/).
+        // Only offer the block for overrides when that file is a real file under the site root, so an
+        // override can be created from it.
+        if ($component === '' || $view === '' || $file === '' || strpos($file, JPATH_SITE) !== 0 || !is_file($file)) {
+            return;
+        }
+
+        $source = str_replace('\\', '/', ltrim(substr($file, \strlen(JPATH_SITE)), '/\\'));
+
         $key       = $component . '|' . $view . '|' . $layout . '|' . $block;
         $occ       = $this->occurrences[$key] = ($this->occurrences[$key] ?? 0) + 1;
 
@@ -95,15 +108,17 @@ final class View extends CMSPlugin implements SubscriberInterface
         // correct) so the editor writes the override to the right template, not just the default one.
         $template = (string) $this->getApplication()->getTemplate();
 
-        // Flag whether this block already has a template override, for a cue in the editor toolbar.
-        $fileName     = ($layout !== '' ? $layout . '_' . $block : $block) . '.php';
-        $overrideFile = JPATH_SITE . '/templates/' . $template . '/html/' . $component . '/' . $view . '/' . $fileName;
-        $hasOverride  = ($component !== '' && $view !== '' && is_file($overrideFile)) ? '1' : '0';
+        // The override lives at the Joomla convention for this component/view, named after the source
+        // file core rendered; flag whether it already exists for a cue in the editor toolbar.
+        $overrideFile = JPATH_SITE . '/templates/' . $template . '/html/' . $component . '/' . $view . '/' . basename($source);
+        $hasOverride  = is_file($overrideFile) ? '1' : '0';
 
         // Values are already sanitised by core (component = option cmd; view/layout/block cleaned in
-        // HtmlView; template is a folder element), so they cannot contain ';' or '-->'.
+        // HtmlView; template is a folder element); the source is a real file path under the site root,
+        // so none of them can contain ';' or '-->'.
         $meta = 'component=' . $component . ';view=' . $view . ';layout=' . $layout
-            . ';block=' . $block . ';occ=' . $occ . ';template=' . $template . ';override=' . $hasOverride;
+            . ';block=' . $block . ';occ=' . $occ . ';template=' . $template
+            . ';source=' . $source . ';override=' . $hasOverride;
 
         $event->setArgument('output', '<!--customize-block-start:' . $meta . '-->' . $output . '<!--customize-block-end-->');
     }
@@ -213,24 +228,33 @@ final class View extends CMSPlugin implements SubscriberInterface
     {
         $component = preg_replace('/[^a-zA-Z0-9_]/', '', (string) ($payload['component'] ?? ''));
         $view      = preg_replace('/[^a-zA-Z0-9_]/', '', (string) ($payload['view'] ?? ''));
-        $layout    = preg_replace('/[^a-zA-Z0-9_.\-]/', '', (string) ($payload['layout'] ?? ''));
-        $block     = preg_replace('/[^a-zA-Z0-9_.\-]/', '', (string) ($payload['block'] ?? ''));
         $template  = preg_replace('/[^a-zA-Z0-9_\-]/', '', (string) ($payload['template'] ?? ''));
 
-        if ($component === '' || $view === '' || $layout === '') {
+        // The source is the sub-layout file core actually rendered, resolved via the view's own template
+        // paths and carried in the block marker. Constrain it to a real .php file under the site's
+        // components/ tree with no traversal, so it can only ever be a component layout we copy into a
+        // template override. The override itself always lands at the Joomla convention for this
+        // component/view, named after that source file, which is where the component's view reads it.
+        $source = ltrim(str_replace('\\', '/', (string) ($payload['source'] ?? '')), '/');
+
+        if (
+            $component === '' || $view === '' || $source === ''
+            || strpos($source, '..') !== false
+            || strpos($source, 'components/') !== 0
+            || substr($source, -4) !== '.php'
+            || !is_file(JPATH_SITE . '/' . $source)
+        ) {
             return null;
         }
 
-        $fileName = ($block !== '' ? $layout . '_' . $block : $layout) . '.php';
+        $fileName = basename($source);
 
         return [
             'component' => $component,
             'view'      => $view,
-            'layout'    => $layout,
-            'block'     => $block,
             'template'  => $template,
             'fileName'  => $fileName,
-            'source'    => 'components/' . $component . '/tmpl/' . $view . '/' . $fileName,
+            'source'    => $source,
             'relPath'   => '/html/' . $component . '/' . $view . '/' . $fileName,
         ];
     }

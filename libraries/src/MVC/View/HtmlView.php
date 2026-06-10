@@ -445,6 +445,7 @@ class HtmlView extends AbstractView implements CurrentUserInterface
                     'view'      => $this->getName(),
                     'layout'    => $layout,
                     'block'     => $customizeBlock,
+                    'file'      => $this->_template,
                 ]);
                 $app->getDispatcher()->dispatch('onCustomizeRenderView', $event);
                 $customized = $event->getArgument('output');

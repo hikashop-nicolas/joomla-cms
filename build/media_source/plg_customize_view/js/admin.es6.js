@@ -76,6 +76,7 @@ import JC from 'customize.api';
     target.setAttribute('data-customize-block', meta.block || '');
     target.setAttribute('data-customize-occ', meta.occ || '');
     target.setAttribute('data-customize-template', meta.template || '');
+    target.setAttribute('data-customize-source', meta.source || '');
     target.setAttribute('data-customize-name', meta.block || meta.view || 'block');
 
     if (meta.override === '1') {
@@ -139,7 +140,8 @@ import JC from 'customize.api';
       view: ctx.data.view,
       layout: ctx.data.layout,
       block: ctx.data.block,
-      template: ctx.data.template
+      template: ctx.data.template,
+      source: ctx.data.source
     }).then(function (res) {
       if (res && res.success && res.url) {
         window.open(res.url, '_blank', 'noopener');
