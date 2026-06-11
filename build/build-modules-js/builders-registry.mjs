@@ -16,6 +16,9 @@ export const builders = [
   'legacy',
   'mailto',
 
+  // Visual customize mode engine (its plugins import customize.api, so build it first)
+  'customize',
+
   // Components
   'cache',
   'com_actionlogs',
@@ -58,6 +61,11 @@ export const builders = [
   // Plugins
   'plg_behaviour_compat6',
   'plg_content_vote',
+  'plg_customize_content',
+  'plg_customize_language',
+  'plg_customize_module',
+  'plg_customize_position',
+  'plg_customize_view',
   'plg_editors-xtd_image',
   'plg_editors_codemirror',
   'plg_editors_none',
