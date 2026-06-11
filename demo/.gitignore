@@ -1,0 +1,2 @@
+# Local secrets, never committed (use .env.example as the template).
+.env

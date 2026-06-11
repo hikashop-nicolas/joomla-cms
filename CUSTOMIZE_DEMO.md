@@ -26,14 +26,14 @@ package, so you test it by installing Joomla from this branch.
    ```
    composer install
    npm ci
-   npm run build
+   npm run update
    ```
 3. Install Joomla from this source with the normal web installer (point it at an empty database). The
    five `customize` plugins ship enabled on a fresh install.
 4. In the administrator, go to Menus, edit any menu item, and click **Customize** in the toolbar.
 
 If you already have a 6.1 development checkout, you can instead merge `feature/customize-mode` into it
-and re-run `npm run build`. Existing sites get the five plugins enabled through the update SQL in
+and re-run `npm run update`. Existing sites get the five plugins enabled through the update SQL in
 `administrator/components/com_admin/sql/updates`.
 
 ## The editing flow

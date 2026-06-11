@@ -1,0 +1,50 @@
+# Customize-mode demo stack: MySQL + the Joomla fork, built and seeded automatically.
+# Usage: cp .env.example .env, edit the passwords, then `docker compose up -d --build`.
+services:
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpw}
+      MYSQL_DATABASE: ${DB_NAME:-joomla}
+      MYSQL_USER: ${DB_USER:-joomla}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-joomlapw}
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${DB_ROOT_PASSWORD:-rootpw}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  joomla:
+    build:
+      context: .
+      args:
+        REPO: ${REPO:-https://github.com/hikashop-nicolas/joomla-cms.git}
+        BRANCH: ${BRANCH:-feature/customize-mode}
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      JOOMLA_DB_HOST: db
+      JOOMLA_DB_NAME: ${DB_NAME:-joomla}
+      JOOMLA_DB_USER: ${DB_USER:-joomla}
+      JOOMLA_DB_PASSWORD: ${DB_PASSWORD:-joomlapw}
+      JOOMLA_SITE_NAME: ${SITE_NAME:-Customize Mode Demo}
+      JOOMLA_ADMIN_USER: ${ADMIN_USER:-admin}
+      JOOMLA_ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-this-please}
+      JOOMLA_ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+    volumes:
+      - joomla_data:/var/www/html
+      - ./entrypoint.sh:/demo/entrypoint.sh:ro
+      - ./seed.php:/demo/seed.php:ro
+    entrypoint: ["bash", "/demo/entrypoint.sh"]
+    command: ["apache2-foreground"]
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  joomla_data:
