@@ -77,7 +77,30 @@ cloudflared tunnel run --url http://localhost:8080 joomla-demo            # run 
 Then share `https://demo.example.com` and the admin login privately with the reviewers. For a quick
 private share without a domain, plain `http://<vm-ip>` is fine.
 
+## Resetting after someone breaks it
+
+If reviewers share the admin and one of them runs **System > Joomla! Update**, the updater overwrites
+the forked core with stock Joomla: the Customize button disappears and pages stop emitting the
+`data-customize` markup (the custom `media/` and `plugins/` folders survive as orphans, so static assets
+still load but nothing fires). A plain restart will not fix it, because the webroot lives in a named
+volume that the entrypoint only repopulates when empty.
+
+Run the reset script to restore the fork from the image and re-seed:
+
+```
+./reset-demo.sh            # quick reset from the current image
+./reset-demo.sh --rebuild  # rebuild the image from the latest branch first (e.g. 6.1 -> 6.2)
+```
+
+It tears the volumes down, brings the stack back up, and self-checks that the page emits the
+`customize-mode:active` marker again. To diagnose by hand, that same marker is the tell:
+
+```
+curl -s 'http://localhost:8080/?customize=1' | grep customize-mode:active   # empty output = stock core
+```
+
 ## Notes
 
-- To reset the demo to a clean state: `docker compose down -v` (drops the volumes) then `up -d --build`.
 - The admin password lives only in `.env` (gitignored). Use a non-trivial one even for a private demo.
+- Shared-admin demos break this way repeatedly; tell reviewers not to touch System > Update, or keep
+  `reset-demo.sh` handy before each session.
