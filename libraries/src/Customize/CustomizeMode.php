@@ -10,6 +10,8 @@
 namespace Joomla\CMS\Customize;
 
 use Joomla\CMS\Application\CMSApplicationInterface;
+use Joomla\CMS\Factory;
+use Joomla\CMS\Language\Text;
 
 // phpcs:disable PSR1.Files.SideEffects
 \defined('_JEXEC') or die;
@@ -18,13 +20,16 @@ use Joomla\CMS\Application\CMSApplicationInterface;
 /**
  * Tracks whether the visual frontend "Customize" mode is active for the current request.
  *
- * The mode is active only when the request carries the "customize=1" URL parameter. It is NOT made
+ * The mode is active only when the request carries a valid "customize" token: a short-lived value the
+ * admin Customize view mints (signed with the site secret) for an authorised editor. It is NOT made
  * sticky in the session, so normal browsing is never affected; the admin Customize view's engine
- * carries the flag across in-iframe navigation (links and forms) instead.
+ * carries the token across in-iframe navigation (links and forms) and refreshes it before it expires
+ * so a long editing session stays valid.
  *
- * Activation is intentionally not gated by user group: a frontend page in customize mode only gains
- * harmless, invisible data-customize-* wrappers. All editing UI lives in the login-protected admin
- * Customize view, and every save is independently authorised in its handler.
+ * Gating on a signed token (rather than a bare flag) keeps anonymous visitors from activating the
+ * mode by appending the parameter. Even so, a frontend page in customize mode only gains harmless
+ * data-customize-* wrappers; all editing UI lives in the login-protected admin Customize view, and
+ * every save is independently authorised in its handler.
  *
  * @since  __DEPLOY_VERSION__
  */
@@ -56,7 +61,15 @@ final class CustomizeMode
     private static $sprintf = [];
 
     /**
-     * Resolve the customize state for the current request from the URL flag.
+     * Default token lifetime in seconds.
+     *
+     * @var    integer
+     * @since  __DEPLOY_VERSION__
+     */
+    private const TOKEN_TTL = 7200;
+
+    /**
+     * Resolve the customize state for the current request from the signed "customize" token.
      *
      * @param   CMSApplicationInterface  $app  The current application.
      *
@@ -66,7 +79,66 @@ final class CustomizeMode
      */
     public static function detect(CMSApplicationInterface $app): void
     {
-        self::$active = $app->getInput()->getInt('customize', 0) === 1;
+        self::$active = self::validateToken((string) $app->getInput()->getCmd('customize', ''), $app);
+    }
+
+    /**
+     * Mint a signed, short-lived customize token for an authorised editor. Callers must check the
+     * editing permission first; this only signs "user X may customize until time T" with the site
+     * secret, so the frontend can trust it without sharing a session.
+     *
+     * @param   integer  $userId  The editor's user id.
+     * @param   integer  $ttl     Lifetime in seconds.
+     *
+     * @return  string
+     *
+     * @since   __DEPLOY_VERSION__
+     */
+    public static function mintToken(int $userId, int $ttl = self::TOKEN_TTL): string
+    {
+        $payload = $userId . '.' . (time() + $ttl);
+
+        return $payload . '.' . self::sign($payload);
+    }
+
+    /**
+     * Validate a customize token: correct shape, authentic signature and not expired.
+     *
+     * @param   string                   $value  The token from the request.
+     * @param   CMSApplicationInterface  $app    The current application.
+     *
+     * @return  boolean
+     *
+     * @since   __DEPLOY_VERSION__
+     */
+    private static function validateToken(string $value, CMSApplicationInterface $app): bool
+    {
+        if (!preg_match('/^(\d+\.\d+)\.([a-f0-9]{64})$/', $value, $m)) {
+            return false;
+        }
+
+        $payload = $m[1];
+
+        if (!hash_equals(self::sign($payload), $m[2])) {
+            return false;
+        }
+
+        // payload is "<userId>.<expiry>"; reject once past the expiry.
+        return (int) explode('.', $payload)[1] > time();
+    }
+
+    /**
+     * HMAC a token payload with the site secret.
+     *
+     * @param   string  $payload  The "<userId>.<expiry>" payload.
+     *
+     * @return  string
+     *
+     * @since   __DEPLOY_VERSION__
+     */
+    private static function sign(string $payload): string
+    {
+        return hash_hmac('sha256', $payload, (string) Factory::getApplication()->get('secret'));
     }
 
     /**
@@ -79,6 +151,25 @@ final class CustomizeMode
     public static function isActive(): bool
     {
         return self::$active;
+    }
+
+    /**
+     * Build the inline notice shown in place of a layout/override that threw while rendering. Because
+     * customize mode is only active for a holder of a valid (admin-minted) token, the editor is shown
+     * the actual error to help them fix it, along with how to recover.
+     *
+     * @param   string  $message  The thrown error's message.
+     *
+     * @return  string
+     *
+     * @since   __DEPLOY_VERSION__
+     */
+    public static function renderError(string $message): string
+    {
+        return '<div class="customize-render-error" role="alert"><strong>'
+            . htmlspecialchars(Text::_('JLIB_CUSTOMIZE_RENDER_ERROR'), ENT_QUOTES) . '</strong>'
+            . ($message !== '' ? ' <code>' . htmlspecialchars($message, ENT_QUOTES) . '</code>' : '')
+            . '</div>';
     }
 
     /**

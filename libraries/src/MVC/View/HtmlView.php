@@ -427,24 +427,45 @@ class HtmlView extends AbstractView implements CurrentUserInterface
                 unset($this->this);
             }
 
+            $customizeActive = \Joomla\CMS\Customize\CustomizeMode::isActive()
+                && Factory::getApplication()->getDocument()->getType() === 'html';
+
             // Start capturing output into a buffer
+            $obLevel = ob_get_level();
             ob_start();
 
-            // Include the requested template filename in the local scope
-            // (this will execute the view logic).
-            include $this->_template;
+            $renderError = null;
 
-            // Done with the requested template; get the buffer and
-            // clear it.
-            $this->_output = ob_get_clean();
+            try {
+                // Include the requested template filename in the local scope
+                // (this will execute the view logic).
+                include $this->_template;
+
+                // Done with the requested template; get the buffer and
+                // clear it.
+                $this->_output = ob_get_clean();
+            } catch (\Throwable $e) {
+                // Discard any partial (or leaked) output from the failed template.
+                while (ob_get_level() > $obLevel) {
+                    ob_end_clean();
+                }
+
+                // Outside customize mode keep the normal behaviour and let the error surface; in
+                // customize mode swallow it here so the hook below can render a recoverable inline
+                // error in place of the broken layout/override rather than fataling the whole page.
+                if (!$customizeActive) {
+                    throw $e;
+                }
+
+                $this->_output = '';
+                $renderError   = $e;
+            }
 
             // Customize mode: fire a hook so the customize "view" plugin can instrument every rendered
-            // layout (the top-level view layout and each sub-layout). Core only dispatches the event and
-            // uses the returned string; it holds no knowledge of the customize markup itself.
-            if (
-                \Joomla\CMS\Customize\CustomizeMode::isActive()
-                && Factory::getApplication()->getDocument()->getType() === 'html'
-            ) {
+            // layout (the top-level view layout and each sub-layout), or render a recoverable inline
+            // error when a layout threw. Core only dispatches the event and uses the returned string;
+            // it holds no knowledge of the customize markup itself.
+            if ($customizeActive) {
                 $app   = Factory::getApplication();
                 $event = new \Joomla\CMS\Event\GenericEvent('onCustomizeRenderView', [
                     'subject'   => $this,
@@ -454,6 +475,7 @@ class HtmlView extends AbstractView implements CurrentUserInterface
                     'layout'    => $layout,
                     'block'     => $customizeId,
                     'file'      => $renderedTemplate,
+                    'error'     => $renderError instanceof \Throwable ? $renderError->getMessage() : '',
                 ]);
                 Factory::getContainer()->get(\Joomla\Event\DispatcherInterface::class)->dispatch('onCustomizeRenderView', $event);
                 $customized = $event->getArgument('output');

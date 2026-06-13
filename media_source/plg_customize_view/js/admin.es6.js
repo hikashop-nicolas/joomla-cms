@@ -260,6 +260,7 @@ import JC from 'customize.api';
   // focused template editor in a modal that closes on save and refreshes the preview.
   function openLayoutEditor(ctx) {
     JC.callAction('view', 'override', {
+      type: 'view',
       component: ctx.data.component,
       view: ctx.data.view,
       layout: ctx.data.layout,

@@ -152,6 +152,7 @@ import JC from 'customize.api';
   // save), reusing the view plugin's shared override-resolve action.
   function openModuleLayoutEditor(ctx) {
     JC.callAction('view', 'override', {
+      type: 'module',
       component: ctx.data.module,
       view: '',
       source: ctx.data.source,

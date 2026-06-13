@@ -18,6 +18,23 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
 
+    // Keep the customize token fresh so a long-open editor keeps working past the token's lifetime.
+    if (opts.tokenUrl && opts.tokenRefreshMs) {
+      window.setInterval(function () {
+        // Resolve against the current admin page so the relative URL keeps the subfolder + admin path.
+        fetch(new URL(opts.tokenUrl, window.location.href).toString(), { credentials: 'same-origin' })
+          .then(function (response) {
+            return response.json();
+          })
+          .then(function (json) {
+            if (json && json.data && json.data.token) {
+              JC.setFrameToken(json.data.token);
+            }
+          })
+          .catch(function () {});
+      }, opts.tokenRefreshMs);
+    }
+
     var toolbar = null;
     var srStatus = null;
     // After a reload (e.g. a cross-position move re-renders the frame), re-select this element so the
@@ -506,10 +523,15 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     }
 
-    // Carry customize=1 across in-iframe navigation (same-origin links and forms), so the mode
-    // persists without making it sticky in the session (which would leak into normal browsing).
+    // Carry the customize token across in-iframe navigation (same-origin links and forms), so the
+    // mode persists without making it sticky in the session (which would leak into normal browsing).
     function carryCustomize(doc) {
-      var host = doc.location.host;
+      var host  = doc.location.host;
+      var token = JC.getFrameToken();
+
+      if (!token) {
+        return;
+      }
 
       Array.prototype.forEach.call(doc.querySelectorAll('a[href]'), function (a) {
         if (a.host !== host) {
@@ -518,11 +540,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
         var href = a.getAttribute('href');
 
-        if (!href || href.charAt(0) === '#' || a.search.indexOf('customize=1') !== -1) {
+        if (!href || href.charAt(0) === '#' || a.search.indexOf('customize=') !== -1) {
           return;
         }
 
-        a.search = (a.search ? a.search + '&' : '?') + 'customize=1';
+        a.search = (a.search ? a.search + '&' : '?') + 'customize=' + encodeURIComponent(token);
       });
 
       Array.prototype.forEach.call(doc.querySelectorAll('form'), function (form) {
@@ -533,7 +555,7 @@ document.addEventListener('DOMContentLoaded', function () {
         var input = doc.createElement('input');
         input.type = 'hidden';
         input.name = 'customize';
-        input.value = '1';
+        input.value = token;
         form.appendChild(input);
       });
     }

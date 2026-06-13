@@ -11,6 +11,8 @@
   var areaTypes = {};
   var buttons = {};
   var uid = 0;
+  // The signed customize token carried into the iframe; refreshed in place for long sessions.
+  var frameToken = null;
 
   function options() {
     return (window.Joomla && window.Joomla.getOptions) ? (window.Joomla.getOptions('customize') || {}) : {};
@@ -174,17 +176,51 @@
     },
 
     /**
-     * Reload the preview iframe, e.g. after an edit dialog persisted a change.
+     * The current customize token (the signed value carried in the iframe URL). Initialised from the
+     * page options, then kept fresh by the engine's periodic refresh.
+     */
+    getFrameToken: function () {
+      if (frameToken === null) {
+        frameToken = options().frameToken || '';
+      }
+
+      return frameToken;
+    },
+
+    /**
+     * Replace the customize token with a freshly minted one.
+     */
+    setFrameToken: function (value) {
+      if (value) {
+        frameToken = value;
+      }
+
+      return this;
+    },
+
+    /**
+     * Reload the preview iframe, e.g. after an edit dialog persisted a change, using the current
+     * token so a long session that outlived the original one still loads in customize mode.
      */
     reloadFrame: function () {
       var frame = window.document.getElementById(options().frameId || 'customize-frame');
 
-      if (frame) {
-        try {
-          frame.contentWindow.location.reload();
-        } catch (e) {
-          frame.src = frame.src;
+      if (!frame) {
+        return;
+      }
+
+      try {
+        var win = frame.contentWindow;
+        var url = new URL(win.location.href);
+        var token = JoomlaCustomize.getFrameToken();
+
+        if (token) {
+          url.searchParams.set('customize', token);
         }
+
+        win.location.replace(url.toString());
+      } catch (e) {
+        frame.src = frame.src;
       }
     },
 

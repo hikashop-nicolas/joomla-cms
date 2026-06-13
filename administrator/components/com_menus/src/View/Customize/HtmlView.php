@@ -11,6 +11,7 @@
 namespace Joomla\Component\Menus\Administrator\View\Customize;
 
 use Joomla\CMS\Access\Exception\NotAllowed;
+use Joomla\CMS\Customize\CustomizeMode;
 use Joomla\CMS\Factory;
 use Joomla\CMS\Language\Text;
 use Joomla\CMS\MVC\View\HtmlView as BaseHtmlView;
@@ -46,6 +47,14 @@ class HtmlView extends BaseHtmlView
     protected $previewUrl = '';
 
     /**
+     * The signed customize token carried in the preview URL and refreshed by the engine.
+     *
+     * @var    string
+     * @since  __DEPLOY_VERSION__
+     */
+    protected $customizeToken = '';
+
+    /**
      * Execute and display a template script.
      *
      * @param   string  $tpl  The name of the template file to parse.
@@ -65,6 +74,10 @@ class HtmlView extends BaseHtmlView
 
         $model = $app->bootComponent('com_menus')->getMVCFactory()
             ->createModel('Item', 'Administrator', ['ignore_request' => true]);
+
+        // Mint the signed token for this editor (the permission check above is the gate) and carry it
+        // in the preview URL; the engine refreshes it for long sessions.
+        $this->customizeToken = CustomizeMode::mintToken((int) $this->getCurrentUser()->id);
 
         $this->item       = $model->getItem($id);
         $this->previewUrl = $this->buildPreviewUrl($id);
@@ -90,10 +103,10 @@ class HtmlView extends BaseHtmlView
         }
 
         // Route by Itemid in the site context; falls back to a non-SEF URL if routing yields nothing.
-        $url = Route::link('site', 'index.php?Itemid=' . $id . '&customize=1', false, Route::TLS_IGNORE, true);
+        $url = Route::link('site', 'index.php?Itemid=' . $id . '&customize=' . $this->customizeToken, false, Route::TLS_IGNORE, true);
 
         if (empty($url)) {
-            $url = Uri::root() . 'index.php?Itemid=' . $id . '&customize=1';
+            $url = Uri::root() . 'index.php?Itemid=' . $id . '&customize=' . $this->customizeToken;
         }
 
         return $url;

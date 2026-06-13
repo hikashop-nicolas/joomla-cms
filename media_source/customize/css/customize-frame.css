@@ -333,3 +333,15 @@
   max-width: 100%;
   font: inherit;
 }
+
+/* Shown in place of a layout/override that threw while rendering, so the page survives and the block
+   stays selectable for Edit layout / Delete override. */
+.customize-render-error {
+  padding: 10px 14px;
+  margin: 6px 0;
+  font: 13px/1.5 sans-serif;
+  color: #842029;
+  background: #f8d7da;
+  border: 1px solid #dc3545;
+  border-radius: 4px;
+}

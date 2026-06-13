@@ -10,6 +10,7 @@
 
 namespace Joomla\Component\Menus\Administrator\Controller;
 
+use Joomla\CMS\Customize\CustomizeMode;
 use Joomla\CMS\Factory;
 use Joomla\CMS\Language\Associations;
 use Joomla\CMS\Language\LanguageHelper;
@@ -84,5 +85,30 @@ class AjaxController extends BaseController
 
             echo new JsonResponse($associations, $message);
         }
+    }
+
+    /**
+     * Mint a fresh signed customize token for the current editor, so the customize engine can keep a
+     * long editing session valid. Authorised like the Customize view itself.
+     *
+     * @return  void
+     *
+     * @since   __DEPLOY_VERSION__
+     */
+    public function customizeToken()
+    {
+        if (!Session::checkToken('get')) {
+            echo new JsonResponse(null, Text::_('JINVALID_TOKEN'), true);
+
+            return;
+        }
+
+        if (!$this->app->getIdentity()->authorise('core.edit', 'com_menus')) {
+            echo new JsonResponse(null, Text::_('JERROR_ALERTNOAUTHOR'), true);
+
+            return;
+        }
+
+        echo new JsonResponse(['token' => CustomizeMode::mintToken((int) $this->app->getIdentity()->id)]);
     }
 }

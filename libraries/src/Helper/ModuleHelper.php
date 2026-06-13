@@ -12,6 +12,7 @@ namespace Joomla\CMS\Helper;
 use Joomla\CMS\Cache\CacheControllerFactoryInterface;
 use Joomla\CMS\Cache\Controller\CallbackController;
 use Joomla\CMS\Component\ComponentHelper;
+use Joomla\CMS\Customize\CustomizeMode;
 use Joomla\CMS\Event\Module;
 use Joomla\CMS\Factory;
 use Joomla\CMS\Filter\InputFilter;
@@ -157,7 +158,30 @@ abstract class ModuleHelper
         $params = new Registry($module->params);
 
         // Render the module content
-        static::renderRawModule($module, $params, $attribs);
+        $obLevel = ob_get_level();
+        $scope   = $app->scope;
+
+        try {
+            static::renderRawModule($module, $params, $attribs);
+        } catch (\Throwable $e) {
+            // renderRawModule opened an output buffer and changed the app scope before the module threw;
+            // restore both so the rest of the page still renders (a leaked buffer would swallow it).
+            while (ob_get_level() > $obLevel) {
+                ob_end_clean();
+            }
+
+            $app->scope = $scope;
+
+            // Outside customize mode keep the normal behaviour and let the error surface. In customize
+            // mode a broken module override (e.g. edited in the page builder) must not fatal the whole
+            // page, since modules render on every page, so show a recoverable inline error in the
+            // module's place; the customize "module" renderer still wraps it for Edit layout / Delete.
+            if (!CustomizeMode::isActive() || $app->getDocument()->getType() !== 'html') {
+                throw $e;
+            }
+
+            return CustomizeMode::renderError($e->getMessage());
+        }
 
         // Return early if only the content is required
         if (!empty($attribs['contentOnly'])) {
