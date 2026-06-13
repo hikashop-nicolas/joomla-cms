@@ -112,6 +112,83 @@
     },
 
     /**
+     * Open a core admin edit screen (article, module, menu item, ...) in a JoomlaDialog iframe
+     * instead of a new tab, and refresh the preview when it closes. opts:
+     * { url, title?, checkin?, onClose? }.
+     *
+     * Mirrors Joomla's native modal-edit flow: the screen is opened with layout=modal, so that on
+     * Save & Close / Cancel its controller redirects to the modalreturn layout, which posts a
+     * (joomla:content-select | joomla:cancel) message to this window; we close on either, then run
+     * onClose. checkin releases the edit lock if the dialog is dismissed without Save/Cancel.
+     */
+    openEditModal: function (opts) {
+      // Resolve against the current admin page (not just the origin) so the relative "index.php"
+      // keeps the site subfolder and the administrator/ path.
+      var url = new URL(opts.url, window.location.href);
+      url.searchParams.set('tmpl', 'component');
+
+      var token = (window.Joomla && window.Joomla.getOptions) ? window.Joomla.getOptions('csrf.token', '') : '';
+      if (token) {
+        url.searchParams.set(token, '1');
+      }
+
+      // Tell core's modalreturn script to report back via postMessage, not the legacy modal API.
+      window.JoomlaExpectingPostMessage = true;
+
+      return import('joomla.dialog').then(function (module) {
+        var JoomlaDialog = module.default;
+        var dialog = new JoomlaDialog({ popupType: 'iframe', src: url.toString(), textHeader: opts.title || '' });
+        dialog.classList.add('customize-edit-dialog');
+
+        function onMessage(event) {
+          if (event.origin !== window.location.origin) {
+            return;
+          }
+
+          var type = event.data && event.data.messageType;
+          if (type === 'joomla:content-select' || type === 'joomla:cancel') {
+            dialog.close();
+          }
+        }
+
+        dialog.addEventListener('joomla-dialog:close', function () {
+          window.removeEventListener('message', onMessage);
+          delete window.JoomlaExpectingPostMessage;
+
+          if (opts.checkin && window.Joomla && typeof window.Joomla.request === 'function') {
+            window.Joomla.request({ url: opts.checkin + (token ? '&' + token + '=1' : ''), method: 'POST' });
+          }
+
+          if (typeof opts.onClose === 'function') {
+            opts.onClose();
+          }
+
+          dialog.destroy();
+        });
+
+        window.addEventListener('message', onMessage);
+        dialog.show();
+
+        return dialog;
+      });
+    },
+
+    /**
+     * Reload the preview iframe, e.g. after an edit dialog persisted a change.
+     */
+    reloadFrame: function () {
+      var frame = window.document.getElementById(options().frameId || 'customize-frame');
+
+      if (frame) {
+        try {
+          frame.contentWindow.location.reload();
+        } catch (e) {
+          frame.src = frame.src;
+        }
+      }
+    },
+
+    /**
      * Replace an element's content with an in-place WYSIWYG (TinyMCE) editor, and restore the
      * rendered content on save. opts: { html, save(content) -> Promise<{ success, html? }> }.
      */

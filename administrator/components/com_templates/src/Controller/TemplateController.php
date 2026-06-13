@@ -64,6 +64,15 @@ class TemplateController extends BaseController
      */
     public function cancel()
     {
+        if ($this->input->get('layout') === 'modal') {
+            // Editing in a modal: go to the modalreturn layout, which closes the dialog.
+            $url = 'index.php?option=com_templates&view=template&layout=modalreturn&tmpl=component&id=' . (int) $this->input->get('id', 0, 'int')
+                . '&file=' . (string) $this->input->getCmd('file', '') . '&isMedia=' . $this->input->getInt('isMedia', 0) . '&from-task=cancel';
+            $this->setRedirect(Route::_($url, false));
+
+            return;
+        }
+
         $this->setRedirect(Route::_('index.php?option=com_templates&view=templates', false));
     }
 
@@ -271,6 +280,8 @@ class TemplateController extends BaseController
 
         $data         = $this->input->post->get('jform', [], 'array');
         $task         = $this->getTask();
+        $layout       = $this->input->get('layout');
+        $modalSuffix  = $layout === 'modal' ? '&layout=modal&tmpl=component' : '';
 
         /** @var \Joomla\Component\Templates\Administrator\Model\TemplateModel $model */
         $model        = $this->getModel();
@@ -329,7 +340,7 @@ class TemplateController extends BaseController
             }
 
             // Redirect back to the edit screen.
-            $url = 'index.php?option=com_templates&view=template&id=' . $model->getState('extension.id') . '&file=' . $fileName . '&isMedia=' . $this->input->getInt('isMedia', 0);
+            $url = 'index.php?option=com_templates&view=template&id=' . $model->getState('extension.id') . '&file=' . $fileName . '&isMedia=' . $this->input->getInt('isMedia', 0) . $modalSuffix;
             $this->setRedirect(Route::_($url, false));
 
             return;
@@ -339,7 +350,7 @@ class TemplateController extends BaseController
         if (!$model->save($data)) {
             // Redirect back to the edit screen.
             $this->setMessage(Text::sprintf('JERROR_SAVE_FAILED', $model->getError()), 'warning');
-            $url = 'index.php?option=com_templates&view=template&id=' . $model->getState('extension.id') . '&file=' . $fileName . '&isMedia=' . $this->input->getInt('isMedia', 0);
+            $url = 'index.php?option=com_templates&view=template&id=' . $model->getState('extension.id') . '&file=' . $fileName . '&isMedia=' . $this->input->getInt('isMedia', 0) . $modalSuffix;
             $this->setRedirect(Route::_($url, false));
 
             return;
@@ -351,11 +362,18 @@ class TemplateController extends BaseController
         switch ($task) {
             case 'apply':
                 // Redirect back to the edit screen.
-                $url = 'index.php?option=com_templates&view=template&id=' . $model->getState('extension.id') . '&file=' . $fileName . '&isMedia=' . $this->input->getInt('isMedia', 0);
+                $url = 'index.php?option=com_templates&view=template&id=' . $model->getState('extension.id') . '&file=' . $fileName . '&isMedia=' . $this->input->getInt('isMedia', 0) . $modalSuffix;
                 $this->setRedirect(Route::_($url, false));
                 break;
 
             default:
+                if ($layout === 'modal') {
+                    // Editing in a modal: go to the modalreturn layout, which closes the dialog.
+                    $url = 'index.php?option=com_templates&view=template&layout=modalreturn&tmpl=component&id=' . $model->getState('extension.id') . '&file=' . $fileName . '&isMedia=' . $this->input->getInt('isMedia', 0) . '&from-task=save';
+                    $this->setRedirect(Route::_($url, false));
+                    break;
+                }
+
                 // Redirect to the list screen.
                 $file = base64_encode('home');
                 $id   = (int) $this->input->get('id', 0, 'int');
@@ -437,6 +455,15 @@ class TemplateController extends BaseController
             $this->setRedirect(Route::_($url, false));
         } elseif ($model->deleteFile($file)) {
             $this->setMessage(Text::_('COM_TEMPLATES_FILE_DELETE_SUCCESS'));
+
+            if ($this->input->get('layout') === 'modal') {
+                // Deleting an override from the modal editor: close the dialog and refresh the preview.
+                $url = 'index.php?option=com_templates&view=template&layout=modalreturn&tmpl=component&id=' . $id . '&file=' . $file . '&isMedia=' . $this->input->getInt('isMedia', 0) . '&from-task=save';
+                $this->setRedirect(Route::_($url, false));
+
+                return;
+            }
+
             $file = base64_encode('home');
             $url  = 'index.php?option=com_templates&view=template&id=' . $id . '&file=' . $file . '&isMedia=' . $this->input->getInt('isMedia', 0);
             $this->setRedirect(Route::_($url, false));

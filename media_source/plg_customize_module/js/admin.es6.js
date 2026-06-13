@@ -140,11 +140,16 @@ import JC from 'customize.api';
   }
 
   function openModuleEditor(ctx) {
-    window.open('index.php?option=com_modules&task=module.edit&id=' + encodeURIComponent(ctx.data.id), '_blank', 'noopener');
+    JC.openEditModal({
+      url: 'index.php?option=com_modules&view=module&layout=modal&id=' + encodeURIComponent(ctx.data.id),
+      title: t('PLG_CUSTOMIZE_MODULE_BTN_ADVANCED', 'Advanced'),
+      checkin: 'index.php?option=com_modules&task=modules.checkin&format=json&cid[]=' + encodeURIComponent(ctx.data.id),
+      onClose: reloadFrame
+    });
   }
 
-  // Create (if needed) and open the override of this module's own layout file, reusing the view
-  // plugin's shared override action.
+  // Open the focused editor for this module's own layout file (the override is created lazily on
+  // save), reusing the view plugin's shared override-resolve action.
   function openModuleLayoutEditor(ctx) {
     JC.callAction('view', 'override', {
       component: ctx.data.module,
@@ -153,7 +158,11 @@ import JC from 'customize.api';
       template: ctx.data.template
     }).then(function (res) {
       if (res && res.success && res.url) {
-        window.open(res.url, '_blank', 'noopener');
+        JC.openEditModal({
+          url: res.url,
+          title: t('PLG_CUSTOMIZE_MODULE_BTN_LAYOUT', 'Edit layout'),
+          onClose: reloadFrame
+        });
       } else {
         JC.ui.toast(ctx.doc, (res && res.message) || t('PLG_CUSTOMIZE_MODULE_UNKNOWN_ERROR', 'unknown error'));
       }
@@ -175,6 +184,21 @@ import JC from 'customize.api';
     // Layout override needs core.admin, and only shows when the module's layout file was resolved.
     if (perms.overrides) {
       JC.registerButton('module', { id: 'layout', label: t('PLG_CUSTOMIZE_MODULE_BTN_LAYOUT', 'Edit layout'), order: 80, requires: 'source', onClick: openModuleLayoutEditor });
+
+      // Flag modules whose layout file already has an override (mirrors the view-block "Overridden" cue).
+      JC.on('customize:frame-ready', function (e) {
+        var doc = e.detail && e.detail.doc;
+
+        if (!doc) {
+          return;
+        }
+
+        Array.prototype.forEach.call(doc.querySelectorAll('[data-customize-type="module"][data-customize-override="1"]'), function (el) {
+          if (!el.getAttribute('data-customize-cue')) {
+            el.setAttribute('data-customize-cue', t('PLG_CUSTOMIZE_MODULE_OVERRIDDEN', 'Overridden'));
+          }
+        });
+      });
     }
 
     JC.registerButton('module', { id: 'advanced', label: t('PLG_CUSTOMIZE_MODULE_BTN_ADVANCED', 'Advanced'), order: 90, onClick: openModuleEditor });
@@ -192,7 +216,12 @@ import JC from 'customize.api';
   }
 
   function openMenuItemEditor(ctx) {
-    window.open('index.php?option=com_menus&task=item.edit&id=' + encodeURIComponent(ctx.data.id), '_blank', 'noopener');
+    JC.openEditModal({
+      url: 'index.php?option=com_menus&view=item&layout=modal&id=' + encodeURIComponent(ctx.data.id),
+      title: t('PLG_CUSTOMIZE_MODULE_BTN_ADVANCED', 'Advanced'),
+      checkin: 'index.php?option=com_menus&task=items.checkin&format=json&cid[]=' + encodeURIComponent(ctx.data.id),
+      onClose: reloadFrame
+    });
   }
 
   // Rename a menu item in place. Uses a real text input (not contenteditable on the menu link), so

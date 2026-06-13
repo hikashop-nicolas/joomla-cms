@@ -18,8 +18,6 @@ use Joomla\CMS\Plugin\CMSPlugin;
 use Joomla\CMS\Session\Session;
 use Joomla\Database\DatabaseInterface;
 use Joomla\Event\SubscriberInterface;
-use Joomla\Filesystem\File;
-use Joomla\Filesystem\Folder;
 
 // phpcs:disable PSR1.Files.SideEffects
 \defined('_JEXEC') or die;
@@ -191,22 +189,11 @@ final class View extends CMSPlugin implements SubscriberInterface
             return $this->fail(Text::_('PLG_CUSTOMIZE_VIEW_OVERRIDE_FAILED'));
         }
 
-        // Use JPATH_SITE explicitly: this handler runs in the admin app, where JPATH_THEMES would be
-        // the administrator templates directory.
-        $overrideFile = JPATH_SITE . '/templates/' . $parts['template'] . $parts['relPath'];
-
-        // Create the override once; never overwrite an existing (possibly user-edited) one.
-        if (!is_file($overrideFile)) {
-            $dir = \dirname($overrideFile);
-
-            if ((!is_dir($dir) && !Folder::create($dir)) || !File::copy($source, $overrideFile)) {
-                return $this->fail(Text::_('PLG_CUSTOMIZE_VIEW_OVERRIDE_FAILED'));
-            }
-        }
-
-        // Native template-editor URL (see com_templates TemplateModel::getFile / TemplateController).
+        // The override is NOT created here. The focused editor (com_templates, layout=modal) seeds
+        // from the original file and only writes the override on save, so opening then cancelling, or
+        // saving without changes, leaves no orphan override that silently shadows the core layout.
         $fileParam = base64_encode(str_replace('\\', '//', $parts['relPath']));
-        $url       = 'index.php?option=com_templates&view=template&id=' . (int) $extId
+        $url       = 'index.php?option=com_templates&view=template&layout=modal&id=' . (int) $extId
             . '&file=' . $fileParam . '&isMedia=0';
 
         return json_encode(['success' => true, 'url' => $url]);

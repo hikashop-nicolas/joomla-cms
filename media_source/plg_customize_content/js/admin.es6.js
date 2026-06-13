@@ -344,10 +344,15 @@ import JC from 'customize.api';
     });
   }
 
-  // --- Advanced: open the full article form in a new tab ----------------------
+  // --- Advanced: open the full article form in a modal -----------------------
 
   function openArticleEditor(ctx) {
-    window.open('index.php?option=com_content&task=article.edit&id=' + encodeURIComponent(ctx.data.id), '_blank', 'noopener');
+    JC.openEditModal({
+      url: 'index.php?option=com_content&view=article&layout=modal&id=' + encodeURIComponent(ctx.data.id),
+      title: t('PLG_CUSTOMIZE_CONTENT_BTN_ADVANCED', 'Advanced'),
+      checkin: 'index.php?option=com_content&task=articles.checkin&format=json&cid[]=' + encodeURIComponent(ctx.data.id),
+      onClose: reloadFrame
+    });
   }
 
   // --- Mark the title, image and details as their own areas -------------------

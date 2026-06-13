@@ -28,7 +28,10 @@ $wa = $this->getDocument()->getWebAssetManager();
 // importmap:true), so the manager adds the api to the page import map.
 $wa->getRegistry()->addExtensionRegistryFile('customize');
 $wa->useStyle('customize.style')
-    ->useScript('customize.engine');
+    ->useScript('customize.engine')
+    // Editing actions open core admin screens in a JoomlaDialog iframe; register it so the
+    // engine's dynamic import('joomla.dialog') resolves through the page import map.
+    ->useScript('joomla.dialog');
 
 // Each customize plugin registers its own admin-side JS in onCustomizeAdminInit (dispatched below),
 // gated on the permission needed to use it, so editing UI the user cannot use is never loaded.

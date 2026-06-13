@@ -376,6 +376,7 @@ final class Module extends CMSPlugin implements SubscriberInterface
             'PLG_CUSTOMIZE_MODULE_MENUITEM',
             'PLG_CUSTOMIZE_MODULE_MENUITEM_SAVED',
             'PLG_CUSTOMIZE_MODULE_MENU_REORDERED',
+            'PLG_CUSTOMIZE_MODULE_OVERRIDDEN',
             'PLG_CUSTOMIZE_MODULE_PUBLISHED',
             'PLG_CUSTOMIZE_MODULE_SAVED',
             'PLG_CUSTOMIZE_MODULE_SAVE_ERROR',

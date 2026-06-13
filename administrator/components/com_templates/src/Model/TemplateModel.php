@@ -951,18 +951,30 @@ class TemplateModel extends FormModel
                 return;
             }
 
+            $ds            = DIRECTORY_SEPARATOR;
+            $cleanFileName = str_replace(JPATH_ROOT . ($this->template->client_id === 1 ? $ds . 'administrator' . $ds : $ds) . 'templates' . $ds . $this->template->element, '', $fileName);
+            $coreFile      = $this->getCoreFile($cleanFileName, $this->template->client_id);
+
             if (file_exists($filePath)) {
                 $item->extension_id = $this->getState('extension.id');
                 $item->filename     = Path::clean($fileName);
                 $item->source       = file_get_contents($filePath);
                 $item->filePath     = Path::clean($filePath);
-                $ds                 = DIRECTORY_SEPARATOR;
-                $cleanFileName      = str_replace(JPATH_ROOT . ($this->template->client_id === 1 ? $ds . 'administrator' . $ds : $ds) . 'templates' . $ds . $this->template->element, '', $fileName);
 
-                if ($coreFile = $this->getCoreFile($cleanFileName, $this->template->client_id)) {
+                if ($coreFile) {
                     $item->coreFile = $coreFile;
                     $item->core     = file_get_contents($coreFile);
                 }
+            } elseif ($coreFile) {
+                // The override does not exist yet: seed the editor from the original (core) file. The
+                // override is created from the edited content on first save (see save()).
+                $item->extension_id = $this->getState('extension.id');
+                $item->filename     = Path::clean($fileName);
+                $item->source       = file_get_contents($coreFile);
+                $item->filePath     = Path::clean($filePath);
+                $item->coreFile     = $coreFile;
+                $item->core         = file_get_contents($coreFile);
+                $item->isNew        = true;
             } else {
                 $app->enqueueMessage(Text::_('COM_TEMPLATES_ERROR_SOURCE_FILE_NOT_FOUND'), 'error');
             }
@@ -1000,24 +1012,40 @@ class TemplateModel extends FormModel
         // Include the extension plugins for the save events.
         PluginHelper::importPlugin('extension');
 
-        $user = get_current_user();
-        chown($filePath, $user);
-        Path::setPermissions($filePath, '0644');
+        // For an existing file, make sure it is writable. A not-yet-created override (lazy creation
+        // from the customize layout editor) has no file to check; File::write creates it below.
+        if (file_exists($filePath)) {
+            $user = get_current_user();
+            chown($filePath, $user);
+            Path::setPermissions($filePath, '0644');
 
-        // Try to make the template file writable.
-        if (!is_writable($filePath)) {
-            $app->enqueueMessage(Text::_('COM_TEMPLATES_ERROR_SOURCE_FILE_NOT_WRITABLE'), 'warning');
-            $app->enqueueMessage(Text::sprintf('COM_TEMPLATES_FILE_PERMISSIONS', Path::getPermissions($filePath)), 'warning');
+            // Try to make the template file writable.
+            if (!is_writable($filePath)) {
+                $app->enqueueMessage(Text::_('COM_TEMPLATES_ERROR_SOURCE_FILE_NOT_WRITABLE'), 'warning');
+                $app->enqueueMessage(Text::sprintf('COM_TEMPLATES_FILE_PERMISSIONS', Path::getPermissions($filePath)), 'warning');
 
-            if (!Path::isOwner($filePath)) {
-                $app->enqueueMessage(Text::_('COM_TEMPLATES_CHECK_FILE_OWNERSHIP'), 'warning');
+                if (!Path::isOwner($filePath)) {
+                    $app->enqueueMessage(Text::_('COM_TEMPLATES_CHECK_FILE_OWNERSHIP'), 'warning');
+                }
+
+                return false;
             }
-
-            return false;
         }
 
         // Make sure EOL is Unix
         $data['source'] = str_replace(["\r\n", "\r"], "\n", $data['source']);
+
+        // A not-yet-created override whose content still matches the original adds nothing but a
+        // shadow file, so do not create it (lazy layout editing from the customize mode).
+        if (!file_exists($filePath)) {
+            $ds            = DIRECTORY_SEPARATOR;
+            $cleanFileName = str_replace(JPATH_ROOT . ($this->template->client_id === 1 ? $ds . 'administrator' . $ds : $ds) . 'templates' . $ds . $this->template->element, '', $filePath);
+
+            if (($coreFile = $this->getCoreFile($cleanFileName, $this->template->client_id))
+                && str_replace(["\r\n", "\r"], "\n", file_get_contents($coreFile)) === $data['source']) {
+                return true;
+            }
+        }
 
         // If the asset file for the template ensure we have valid template so we don't instantly destroy it
         if (str_ends_with($fileName, '/joomla.asset.json') && json_decode($data['source']) === null) {

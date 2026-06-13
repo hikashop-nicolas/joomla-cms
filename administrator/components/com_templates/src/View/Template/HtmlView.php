@@ -227,6 +227,12 @@ class HtmlView extends BaseHtmlView
      */
     protected function addToolbar()
     {
+        if ($this->getLayout() === 'modal') {
+            $this->addModalToolbar();
+
+            return;
+        }
+
         $app     = Factory::getApplication();
         $user    = $this->getCurrentUser();
         $toolbar = $this->getDocument()->getToolbar();
@@ -332,6 +338,34 @@ class HtmlView extends BaseHtmlView
 
         $toolbar->divider();
         $toolbar->help('Templates:_Customise');
+    }
+
+    /**
+     * Add a focused toolbar for editing a single file inside a modal dialog (no tree, no tabs).
+     *
+     * @return  void
+     *
+     * @since   __DEPLOY_VERSION__
+     */
+    protected function addModalToolbar()
+    {
+        $toolbar = $this->getDocument()->getToolbar();
+
+        ToolbarHelper::title(Text::sprintf('COM_TEMPLATES_MANAGER_VIEW_TEMPLATE', ucfirst($this->template->name)), 'icon-code thememanager');
+
+        if ($this->getCurrentUser()->authorise('core.admin') && $this->type === 'file') {
+            $toolbar->apply('template.apply');
+            $toolbar->save('template.save');
+
+            // Existing override only: let the user remove it and revert to the original layout.
+            if (!empty($this->source->coreFile) && empty($this->source->isNew)) {
+                $toolbar->confirmButton('delete', 'COM_TEMPLATES_DELETE_OVERRIDE', 'template.delete')
+                    ->message('COM_TEMPLATES_DELETE_OVERRIDE_CONFIRM')
+                    ->listCheck(false);
+            }
+        }
+
+        $toolbar->cancel('template.cancel');
     }
 
     /**

@@ -256,7 +256,8 @@ import JC from 'customize.api';
     }, 0);
   }
 
-  // "Edit layout": create the override server-side, open Joomla's native template editor in a new tab.
+  // "Edit layout": resolve the override target server-side (created lazily on save) and open the
+  // focused template editor in a modal that closes on save and refreshes the preview.
   function openLayoutEditor(ctx) {
     JC.callAction('view', 'override', {
       component: ctx.data.component,
@@ -267,7 +268,11 @@ import JC from 'customize.api';
       source: ctx.data.source
     }).then(function (res) {
       if (res && res.success && res.url) {
-        window.open(res.url, '_blank', 'noopener');
+        JC.openEditModal({
+          url: res.url,
+          title: t('PLG_CUSTOMIZE_VIEW_BTN_EDIT', 'Edit layout'),
+          onClose: JC.reloadFrame
+        });
       } else {
         JC.ui.toast(ctx.doc, (res && res.message) || t('PLG_CUSTOMIZE_VIEW_UNKNOWN_ERROR', 'unknown error'));
       }
