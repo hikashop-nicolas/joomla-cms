@@ -59,7 +59,10 @@ done
 [ "$ready" -eq 1 ] || echo " (timed out waiting for HTTP; check '$DC logs joomla')"
 
 echo "==> Verifying the forked core is active..."
-if curl -fsS "http://localhost:${PORT}/?customize=1" 2>/dev/null | grep -q 'customize-mode:active'; then
+# Customize mode now needs a signed token, so mint a short-lived one inside the container (it has the
+# site secret) and probe with that; a stock core can't produce the marker for it.
+TOKEN="$($DC exec -T joomla php -r '$c=@file_get_contents("/var/www/html/configuration.php"); if (!$c || !preg_match("/public\\s+\\\$secret\\s*=\\s*\x27([^\x27]*)\x27/", $c, $m)) { exit; } $p = "1." . (time() + 300); echo $p . "." . hash_hmac("sha256", $p, $m[1]);' 2>/dev/null | tr -d '\r\n')"
+if [ -n "$TOKEN" ] && curl -fsS "http://localhost:${PORT}/?customize=${TOKEN}" 2>/dev/null | grep -q 'customize-mode:active'; then
   echo "    OK: customize-mode:active marker present, the fork is live."
 else
   echo "    WARNING: marker NOT found. The core may still be stock; see '$DC logs joomla'." >&2
