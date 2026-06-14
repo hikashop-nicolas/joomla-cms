@@ -243,20 +243,6 @@ import JC from 'customize.api';
     var doc = ctx.doc;
     var span = ctx.el;
     var format = span.getAttribute('data-customize-format');
-    var existing = doc.getElementById('customize-format-edit');
-
-    if (existing) {
-      existing.remove();
-    }
-
-    var box = doc.createElement('div');
-    box.id = 'customize-format-edit';
-    box.className = 'customize-popover';
-
-    var rect = span.getBoundingClientRect();
-    var win = doc.defaultView;
-    box.style.top = (rect.bottom + win.scrollY) + 'px';
-    box.style.left = (rect.left + win.scrollX) + 'px';
 
     var input = doc.createElement('input');
     input.type = 'text';
@@ -266,37 +252,35 @@ import JC from 'customize.api';
     hint.className = 'customize-hint';
     hint.textContent = t('PLG_CUSTOMIZE_LANGUAGE_FORMAT_HINT', 'Keep the %s / %d placeholders where the value goes.');
 
-    box.appendChild(JC.ui.label(doc, t('PLG_CUSTOMIZE_LANGUAGE_LABEL', 'Text')));
-    box.appendChild(input);
-    box.appendChild(hint);
+    JC.ui.popover(doc, {
+      anchor: span,
+      placement: 'below',
+      content: [
+        JC.ui.label(doc, t('PLG_CUSTOMIZE_LANGUAGE_LABEL', 'Text')),
+        input,
+        hint
+      ],
+      onSave: function (api) {
+        JC.ui.saving(api.bar.save);
 
-    var bar = JC.ui.makeBar(doc);
-    box.appendChild(bar.el);
-    doc.body.appendChild(box);
+        JC.callAction('language', 'save', { key: ctx.data.id, value: input.value }).then(function (res) {
+          if (res && res.success) {
+            api.close();
+            reloadFrame();
+          } else {
+            JC.ui.resetSave(api.bar.save);
+            var reason = (res && res.message) || t('PLG_CUSTOMIZE_LANGUAGE_UNKNOWN_ERROR', 'unknown error');
+            JC.ui.toast(doc, t('PLG_CUSTOMIZE_LANGUAGE_SAVE_FAILED', 'Could not save the translation.') + ' ' + reason);
+          }
+        }).catch(function () {
+          JC.ui.resetSave(api.bar.save);
+          JC.ui.toast(doc, t('PLG_CUSTOMIZE_LANGUAGE_SAVE_ERROR', 'Save error.'));
+        });
+      }
+    });
+
     input.focus();
     input.select();
-
-    bar.cancel.addEventListener('click', function () {
-      box.remove();
-    });
-
-    bar.save.addEventListener('click', function () {
-      JC.ui.saving(bar.save);
-
-      JC.callAction('language', 'save', { key: ctx.data.id, value: input.value }).then(function (res) {
-        if (res && res.success) {
-          box.remove();
-          reloadFrame();
-        } else {
-          JC.ui.resetSave(bar.save);
-          var reason = (res && res.message) || t('PLG_CUSTOMIZE_LANGUAGE_UNKNOWN_ERROR', 'unknown error');
-          JC.ui.toast(doc, t('PLG_CUSTOMIZE_LANGUAGE_SAVE_FAILED', 'Could not save the translation.') + ' ' + reason);
-        }
-      }).catch(function () {
-        JC.ui.resetSave(bar.save);
-        JC.ui.toast(doc, t('PLG_CUSTOMIZE_LANGUAGE_SAVE_ERROR', 'Save error.'));
-      });
-    });
   }
 
   // Edit a simple translation in place; saving writes a language override.

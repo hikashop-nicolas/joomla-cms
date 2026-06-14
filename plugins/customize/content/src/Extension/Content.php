@@ -169,10 +169,15 @@ final class Content extends CMSPlugin implements SubscriberInterface
         // editing is unsafe there; list/intro contexts map cleanly to the introtext field.
         $field = ($event->getContext() === 'com_content.article' && !empty($item->fulltext)) ? '' : 'introtext';
 
+        // Save a picked image to the field this view actually renders: the single-article view shows
+        // the full image, list/intro contexts show the intro image. Otherwise it saves out of sight.
+        $imageTarget = $event->getContext() === 'com_content.article' ? 'full' : 'intro';
+
         $open = '<div class="customize-content-area" data-customize-type="content"'
             . ' data-customize-id="' . $id . '"'
             . ' data-customize-name="' . htmlspecialchars($title, ENT_QUOTES) . '"'
-            . ' data-customize-field="' . $field . '">';
+            . ' data-customize-field="' . $field . '"'
+            . ' data-customize-imagetarget="' . $imageTarget . '">';
 
         $item->text = $open . $item->text . '</div>';
     }

@@ -43,19 +43,6 @@ import JC from 'customize.api';
 
   function showPopover(ctx, data) {
     var doc = ctx.doc;
-    var existing = doc.getElementById('customize-module-props');
-    if (existing) {
-      existing.remove();
-    }
-
-    var box = doc.createElement('div');
-    box.id = 'customize-module-props';
-    box.className = 'customize-popover';
-
-    var rect = ctx.el.getBoundingClientRect();
-    var win = doc.defaultView;
-    box.style.top = (rect.top + win.scrollY) + 'px';
-    box.style.left = (rect.left + win.scrollX) + 'px';
 
     var titleInput = doc.createElement('input');
     titleInput.type = 'text';
@@ -77,40 +64,36 @@ import JC from 'customize.api';
     pubWrap.appendChild(published);
     pubWrap.appendChild(doc.createTextNode(t('PLG_CUSTOMIZE_MODULE_PUBLISHED', 'Published')));
 
-    box.appendChild(JC.ui.label(doc, t('PLG_CUSTOMIZE_MODULE_TITLE', 'Title')));
-    box.appendChild(titleInput);
-    box.appendChild(showWrap);
-    box.appendChild(pubWrap);
+    JC.ui.popover(doc, {
+      anchor: ctx.el,
+      content: [
+        JC.ui.label(doc, t('PLG_CUSTOMIZE_MODULE_TITLE', 'Title')),
+        titleInput,
+        showWrap,
+        pubWrap
+      ],
+      onSave: function (api) {
+        JC.ui.saving(api.bar.save);
 
-    var bar = JC.ui.makeBar(doc);
-    box.appendChild(bar.el);
-    doc.body.appendChild(box);
-
-    bar.cancel.addEventListener('click', function () {
-      box.remove();
-    });
-
-    bar.save.addEventListener('click', function () {
-      JC.ui.saving(bar.save);
-
-      ctx.callAction('module', 'save', {
-        id: ctx.data.id,
-        title: titleInput.value,
-        showtitle: showTitle.checked ? 1 : 0,
-        published: published.checked ? 1 : 0
-      }).then(function (res) {
-        if (res && res.success) {
-          box.remove();
-          JC.ui.toast(doc, t('PLG_CUSTOMIZE_MODULE_SAVED', 'Module saved.'));
-          reloadFrame();
-        } else {
-          JC.ui.resetSave(bar.save);
-          JC.ui.toast(doc, failMessage(res));
-        }
-      }).catch(function () {
-        JC.ui.resetSave(bar.save);
-        JC.ui.toast(doc, t('PLG_CUSTOMIZE_MODULE_SAVE_ERROR', 'Save error.'));
-      });
+        ctx.callAction('module', 'save', {
+          id: ctx.data.id,
+          title: titleInput.value,
+          showtitle: showTitle.checked ? 1 : 0,
+          published: published.checked ? 1 : 0
+        }).then(function (res) {
+          if (res && res.success) {
+            api.close();
+            JC.ui.toast(doc, t('PLG_CUSTOMIZE_MODULE_SAVED', 'Module saved.'));
+            reloadFrame();
+          } else {
+            JC.ui.resetSave(api.bar.save);
+            JC.ui.toast(doc, failMessage(res));
+          }
+        }).catch(function () {
+          JC.ui.resetSave(api.bar.save);
+          JC.ui.toast(doc, t('PLG_CUSTOMIZE_MODULE_SAVE_ERROR', 'Save error.'));
+        });
+      }
     });
   }
 

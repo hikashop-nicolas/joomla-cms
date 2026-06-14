@@ -11,6 +11,7 @@
   var areaTypes = {};
   var buttons = {};
   var uid = 0;
+  var transients = [];
   // The signed customize token carried into the iframe; refreshed in place for long sessions.
   var frameToken = null;
 
@@ -482,6 +483,95 @@
       resetSave: function (button) {
         button.disabled = false;
         button.textContent = JoomlaCustomize.text('COM_MENUS_CUSTOMIZE_SAVE', 'Save');
+      },
+
+      /**
+       * Build a positioned popover with a Save/Cancel bar. It is placed next to opts.anchor, appended
+       * to the page, auto-registered as a transient (so the engine dismisses it when another action
+       * starts or the selection changes), and closed on Cancel or Escape. The caller supplies only the
+       * fields and a save handler.
+       *
+       * opts: {
+       *   anchor,            // element to position next to (required)
+       *   placement,         // 'top' (default, at the anchor's top) or 'below' (under it)
+       *   className,         // extra class on the popover (optional)
+       *   content,           // array of field nodes, appended in order before the bar
+       *   saveOnEnter,       // true to also save on Enter (handy for select/input-only popovers)
+       *   onSave(api),       // run on Save; api = { close, bar } (use bar with ui.saving/resetSave)
+       *   onClose(reason)    // optional extra teardown; reason is 'user' for Cancel/Escape
+       * }
+       *
+       * Returns { el, bar, close }.
+       */
+      popover: function (doc, opts) {
+        opts = opts || {};
+        var win = doc.defaultView || window;
+
+        var box = doc.createElement('div');
+        box.className = 'customize-popover' + (opts.className ? ' ' + opts.className : '');
+
+        if (opts.anchor && opts.anchor.getBoundingClientRect) {
+          var rect = opts.anchor.getBoundingClientRect();
+          var top = (opts.placement === 'below' ? rect.bottom : rect.top) + win.scrollY;
+          box.style.top = top + 'px';
+          box.style.left = (rect.left + win.scrollX) + 'px';
+        }
+
+        (opts.content || []).forEach(function (node) {
+          if (node) {
+            box.appendChild(node);
+          }
+        });
+
+        var bar = JoomlaCustomize.ui.makeBar(doc);
+        box.appendChild(bar.el);
+
+        var closed = false;
+        var off = null;
+
+        function close(reason) {
+          if (closed) {
+            return;
+          }
+
+          closed = true;
+
+          if (off) {
+            off();
+            off = null;
+          }
+
+          if (box.parentNode) {
+            box.parentNode.removeChild(box);
+          }
+
+          if (typeof opts.onClose === 'function') {
+            opts.onClose(reason);
+          }
+        }
+
+        bar.cancel.addEventListener('click', function () { close('user'); });
+
+        if (typeof opts.onSave === 'function') {
+          bar.save.addEventListener('click', function () {
+            opts.onSave({ close: close, bar: bar });
+          });
+        }
+
+        box.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            close('user');
+          } else if (opts.saveOnEnter && e.key === 'Enter') {
+            e.preventDefault();
+            bar.save.click();
+          }
+        });
+
+        doc.body.appendChild(box);
+        off = JoomlaCustomize.registerTransient(function () { close(); });
+
+        return { el: box, bar: bar, close: close };
       }
     },
 
@@ -516,6 +606,33 @@
     emit: function (name, detail) {
       bus.dispatchEvent(new CustomEvent(name, { detail: detail }));
       return this;
+    },
+
+    // Transient overlays (popovers, pickers, menus). A plugin calls registerTransient(teardown) when it
+    // opens one; the engine calls dismissTransients() whenever another action starts, the selection
+    // changes, or focus leaves, so overlays never stack. New buttons need no cross-wiring: they just
+    // register their own teardown. registerTransient returns a function that unregisters it.
+    registerTransient: function (teardown) {
+      transients.push(teardown);
+
+      return function () {
+        var i = transients.indexOf(teardown);
+
+        if (i !== -1) {
+          transients.splice(i, 1);
+        }
+      };
+    },
+
+    dismissTransients: function () {
+      var pending = transients;
+      transients = [];
+
+      for (var i = 0; i < pending.length; i++) {
+        try {
+          pending[i]();
+        } catch (e) {}
+      }
     }
   };
 

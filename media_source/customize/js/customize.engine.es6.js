@@ -106,6 +106,8 @@ document.addEventListener('DOMContentLoaded', function () {
       if (current) { current.classList.remove('customize-area-active'); }
       current = null;
       if (toolbar) { toolbar.style.display = 'none'; }
+      // Leaving the selection closes any overlay that was open for it.
+      JC.dismissTransients();
     }
 
     function dataset(el) {
@@ -420,6 +422,8 @@ document.addEventListener('DOMContentLoaded', function () {
       // size changes (e.g. an inline editor growing the element) with no scripting.
       if (current && current !== el) {
         current.classList.remove('customize-area-active');
+        // Selecting a different element closes any overlay opened for the previous one.
+        JC.dismissTransients();
       }
 
       current = el;
@@ -472,6 +476,10 @@ document.addEventListener('DOMContentLoaded', function () {
           // Pin before running the handler so a button can re-select another area (e.g. navigate to a
           // parent or child layout); cleared by a click elsewhere.
           pinned = el;
+
+          // Close any open transient overlay (e.g. the module move picker) before a different action
+          // runs, so two never stack. An action that opens its own overlay re-registers it right after.
+          JC.dismissTransients();
 
           if (typeof button.onClick === 'function') {
             button.onClick({

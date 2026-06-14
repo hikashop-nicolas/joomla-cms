@@ -58,8 +58,9 @@ import JC from 'customize.api';
 
   var draggedModule = null;
   var moveBar = null;
-  var picker = null;
   var pending = null;
+  var movePop = null;       // the open move popover ({ close }), or null
+  var offLoading = null;    // transient covering the positions fetch, before the popover exists
 
   function isModuleEl(el) {
     return el && el.getAttribute('data-customize-type') === 'module';
@@ -72,42 +73,52 @@ import JC from 'customize.api';
     moveBar = null;
   }
 
-  function removePicker() {
-    if (picker && picker.parentNode) {
-      picker.parentNode.removeChild(picker);
-    }
-    picker = null;
-  }
-
-  function cancelMove() {
+  function ungrey() {
     if (pending) {
       pending.classList.remove('customize-pending');
     }
     pending = null;
+  }
+
+  // Abort a move in progress: close the picker (its onClose un-greys) or just un-grey, and drop the
+  // loading guard and drag bar. Used before starting a new move; the engine handles dismissal itself.
+  function cancelMove() {
+    if (offLoading) {
+      offLoading();
+      offLoading = null;
+    }
     removeMoveBar();
-    removePicker();
+
+    if (movePop) {
+      movePop.close();
+    } else {
+      ungrey();
+    }
   }
 
   function openSelector(doc, dirHint) {
+    // Cover the async gap: if another action starts before the picker is built, drop the pending move
+    // (the handler below then bails because pending is cleared).
+    if (offLoading) {
+      offLoading();
+    }
+    offLoading = JC.registerTransient(function () { offLoading = null; ungrey(); });
+
     JC.callAction('position', 'positions', {}).then(function (res) {
+      if (offLoading) {
+        offLoading();
+        offLoading = null;
+      }
+
       if (!pending) {
         return;
       }
 
       if (!res || !res.success) {
         JC.ui.toast(doc, t('PLG_CUSTOMIZE_POSITION_LOAD_FAILED', 'Could not load positions.'));
-        cancelMove();
+        ungrey();
         return;
       }
-
-      // The picker is a popover anchored to the module, not a bar at the bottom of the page.
-      var win = doc.defaultView;
-      var pop = doc.createElement('div');
-      pop.className = 'customize-popover customize-move-pop';
-      var rect = pending.getBoundingClientRect();
-      pop.style.top = (rect.top + win.scrollY) + 'px';
-      pop.style.left = (rect.left + win.scrollX) + 'px';
-      picker = pop;
 
       var currentPos = pending.getAttribute('data-customize-position');
       var movedId = pending.getAttribute('data-customize-id');
@@ -163,59 +174,62 @@ import JC from 'customize.api';
       fillOrder();
       posSel.addEventListener('change', fillOrder);
 
-      pop.appendChild(JC.ui.label(doc, t('PLG_CUSTOMIZE_POSITION_LABEL', 'Position')));
-      pop.appendChild(posSel);
-      pop.appendChild(JC.ui.label(doc, t('PLG_CUSTOMIZE_POSITION_ORDER', 'Order')));
-      pop.appendChild(ordSel);
+      // The picker is just a form popover anchored to the module: the shared helper handles placement,
+      // the Save/Cancel bar, Enter/Escape and auto-dismissal; the move-specific bits go in the hooks.
+      var pop = JC.ui.popover(doc, {
+        anchor: pending,
+        className: 'customize-move-pop',
+        saveOnEnter: true,
+        content: [
+          JC.ui.label(doc, t('PLG_CUSTOMIZE_POSITION_LABEL', 'Position')),
+          posSel,
+          JC.ui.label(doc, t('PLG_CUSTOMIZE_POSITION_ORDER', 'Order')),
+          ordSel
+        ],
+        onClose: function (reason) {
+          movePop = null;
+          var module = pending;
+          ungrey();
 
-      var bar = JC.ui.makeBar(doc);
-      pop.appendChild(bar.el);
-
-      function dismiss() {
-        var module = pending;
-        cancelMove();
-
-        if (module && module.focus) {
-          module.focus();
-        }
-      }
-
-      bar.cancel.addEventListener('click', dismiss);
-
-      bar.save.addEventListener('click', function () {
-        JC.ui.saving(bar.save);
-
-        // Insert the moved module into the target position's list at the chosen slot, then persist the
-        // whole list (reorder sets each module's position + ordering, so this handles both at once).
-        var pos = posSel.value;
-        var ids = modulesIn(pos).map(function (m) { return m.getAttribute('data-customize-id'); });
-        ids.splice(parseInt(ordSel.value, 10) || 0, 0, movedId);
-
-        JC.callAction('position', 'reorder', { position: pos, order: ids }).then(function (r) {
-          if (r && r.success) {
-            // Keep the keyboard user on the module once the frame re-renders in its new spot.
-            if (JC.selectAfterReload) {
-              JC.selectAfterReload(pending, t('COM_MENUS_CUSTOMIZE_AREA_MOVED_TO', 'Moved to %s').replace('%s', pos));
-            }
-
-            pending = null;
-            picker = null;
-            reloadFrame();
-          } else {
-            JC.ui.resetSave(bar.save);
-            var reason = (r && r.message) || t('PLG_CUSTOMIZE_POSITION_UNKNOWN_ERROR', 'unknown error');
-            JC.ui.toast(doc, t('PLG_CUSTOMIZE_POSITION_SAVE_FAILED', 'Save failed: %s').replace('%s', reason));
+          // Cancel/Escape returns the keyboard user to the module; an engine dismiss does not.
+          if (reason === 'user' && module && module.focus) {
+            module.focus();
           }
-        }).catch(function () {
-          JC.ui.resetSave(bar.save);
-          JC.ui.toast(doc, t('PLG_CUSTOMIZE_POSITION_SAVE_ERROR', 'Save error.'));
-        });
+        },
+        onSave: function (api) {
+          JC.ui.saving(api.bar.save);
+
+          // Insert the moved module into the target position's list at the chosen slot, then persist the
+          // whole list (reorder sets each module's position + ordering, so this handles both at once).
+          var pos = posSel.value;
+          var ids = modulesIn(pos).map(function (m) { return m.getAttribute('data-customize-id'); });
+          ids.splice(parseInt(ordSel.value, 10) || 0, 0, movedId);
+
+          JC.callAction('position', 'reorder', { position: pos, order: ids }).then(function (r) {
+            if (r && r.success) {
+              // Keep the keyboard user on the module once the frame re-renders in its new spot.
+              if (JC.selectAfterReload) {
+                JC.selectAfterReload(pending, t('COM_MENUS_CUSTOMIZE_AREA_MOVED_TO', 'Moved to %s').replace('%s', pos));
+              }
+
+              pending = null;   // the frame reloads, so there is nothing to un-grey or refocus
+              api.close();
+              reloadFrame();
+            } else {
+              JC.ui.resetSave(api.bar.save);
+              var reason = (r && r.message) || t('PLG_CUSTOMIZE_POSITION_UNKNOWN_ERROR', 'unknown error');
+              JC.ui.toast(doc, t('PLG_CUSTOMIZE_POSITION_SAVE_FAILED', 'Save failed: %s').replace('%s', reason));
+            }
+          }).catch(function () {
+            JC.ui.resetSave(api.bar.save);
+            JC.ui.toast(doc, t('PLG_CUSTOMIZE_POSITION_SAVE_ERROR', 'Save error.'));
+          });
+        }
       });
 
-      doc.body.appendChild(pop);
+      movePop = pop;
 
-      // Ctrl+Left/Right opened this; pre-step the position, then focus the picker. Tab moves between the
-      // two dropdowns, native arrows choose within one, Enter saves, Escape cancels.
+      // Ctrl+Left/Right opened this: pre-step the position, then focus the picker.
       if (dirHint) {
         var count = posSel.options.length;
 
@@ -226,16 +240,6 @@ import JC from 'customize.api';
       }
 
       posSel.focus();
-
-      pop.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          bar.save.click();
-        } else if (e.key === 'Escape') {
-          e.preventDefault();
-          dismiss();
-        }
-      });
     });
   }
 

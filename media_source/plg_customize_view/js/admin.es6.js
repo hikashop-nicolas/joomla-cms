@@ -289,6 +289,9 @@ import JC from 'customize.api';
     });
 
     doc.body.appendChild(menu);
+    // Auto-dismissed by the engine when another action starts or the selection changes (closeMenu also
+    // detaches the outside-click listener).
+    JC.registerTransient(function () { closeMenu(false); });
 
     // Open with the first item focused so the keyboard lands inside the menu.
     var first = menu.querySelector('.customize-menu-item');

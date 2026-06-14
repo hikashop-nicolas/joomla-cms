@@ -154,7 +154,7 @@ import JC from 'customize.api';
         return;
       }
 
-      ctx.callAction('content', 'saveimage', { id: ctx.data.id, target: 'intro', url: url })
+      ctx.callAction('content', 'saveimage', { id: ctx.data.id, target: ctx.data.imagetarget || 'intro', url: url })
         .then(function (res) {
           if (res && res.success) {
             JC.ui.toast(ctx.doc, t('PLG_CUSTOMIZE_CONTENT_IMAGE_SAVED', 'Image saved.'));
@@ -195,19 +195,6 @@ import JC from 'customize.api';
 
   function showPropsPopover(ctx, data) {
     var doc = ctx.doc;
-    var existing = doc.getElementById('customize-props');
-    if (existing) {
-      existing.remove();
-    }
-
-    var box = doc.createElement('div');
-    box.id = 'customize-props';
-    box.className = 'customize-popover';
-
-    var rect = ctx.el.getBoundingClientRect();
-    var win = doc.defaultView;
-    box.style.top = (rect.top + win.scrollY) + 'px';
-    box.style.left = (rect.left + win.scrollX) + 'px';
 
     var catSel = doc.createElement('select');
     (data.categories || []).forEach(function (c) {
@@ -282,65 +269,61 @@ import JC from 'customize.api';
       nameInput.focus();
     });
 
-    box.appendChild(JC.ui.label(doc, t('PLG_CUSTOMIZE_CONTENT_CATEGORY', 'Category')));
-    box.appendChild(catSel);
-    box.appendChild(newCatLink);
-    box.appendChild(newCatWrap);
-    box.appendChild(JC.ui.label(doc, t('PLG_CUSTOMIZE_CONTENT_STATUS', 'Status')));
-    box.appendChild(stateSel);
-    box.appendChild(featWrap);
+    JC.ui.popover(doc, {
+      anchor: ctx.el,
+      content: [
+        JC.ui.label(doc, t('PLG_CUSTOMIZE_CONTENT_CATEGORY', 'Category')),
+        catSel,
+        newCatLink,
+        newCatWrap,
+        JC.ui.label(doc, t('PLG_CUSTOMIZE_CONTENT_STATUS', 'Status')),
+        stateSel,
+        featWrap
+      ],
+      onSave: function (api) {
+        var action;
+        var args;
 
-    var bar = JC.ui.makeBar(doc);
-    box.appendChild(bar.el);
-    doc.body.appendChild(box);
+        if (newCatMode) {
+          if (!nameInput.value.trim()) {
+            JC.ui.toast(doc, t('PLG_CUSTOMIZE_CONTENT_ENTER_CATEGORY_NAME', 'Enter a category name.'));
+            return;
+          }
 
-    bar.cancel.addEventListener('click', function () {
-      box.remove();
-    });
-
-    bar.save.addEventListener('click', function () {
-      var action;
-      var args;
-
-      if (newCatMode) {
-        if (!nameInput.value.trim()) {
-          JC.ui.toast(doc, t('PLG_CUSTOMIZE_CONTENT_ENTER_CATEGORY_NAME', 'Enter a category name.'));
-          return;
-        }
-
-        action = 'newcategory';
-        args = {
-          id: ctx.data.id,
-          name: nameInput.value.trim(),
-          parent: parseInt(parentSel.value, 10) || 1,
-          state: parseInt(stateSel.value, 10),
-          featured: feat.checked ? 1 : 0
-        };
-      } else {
-        action = 'saveprops';
-        args = {
-          id: ctx.data.id,
-          catid: parseInt(catSel.value, 10),
-          state: parseInt(stateSel.value, 10),
-          featured: feat.checked ? 1 : 0
-        };
-      }
-
-      JC.ui.saving(bar.save);
-
-      ctx.callAction('content', action, args).then(function (res) {
-        if (res && res.success) {
-          box.remove();
-          JC.ui.toast(doc, t('PLG_CUSTOMIZE_CONTENT_PROPS_SAVED', 'Properties saved.'));
-          reloadFrame();
+          action = 'newcategory';
+          args = {
+            id: ctx.data.id,
+            name: nameInput.value.trim(),
+            parent: parseInt(parentSel.value, 10) || 1,
+            state: parseInt(stateSel.value, 10),
+            featured: feat.checked ? 1 : 0
+          };
         } else {
-          JC.ui.resetSave(bar.save);
-          JC.ui.toast(doc, failMessage(res));
+          action = 'saveprops';
+          args = {
+            id: ctx.data.id,
+            catid: parseInt(catSel.value, 10),
+            state: parseInt(stateSel.value, 10),
+            featured: feat.checked ? 1 : 0
+          };
         }
-      }).catch(function () {
-        JC.ui.resetSave(bar.save);
-        JC.ui.toast(doc, t('PLG_CUSTOMIZE_CONTENT_SAVE_ERROR', 'Save error.'));
-      });
+
+        JC.ui.saving(api.bar.save);
+
+        ctx.callAction('content', action, args).then(function (res) {
+          if (res && res.success) {
+            api.close();
+            JC.ui.toast(doc, t('PLG_CUSTOMIZE_CONTENT_PROPS_SAVED', 'Properties saved.'));
+            reloadFrame();
+          } else {
+            JC.ui.resetSave(api.bar.save);
+            JC.ui.toast(doc, failMessage(res));
+          }
+        }).catch(function () {
+          JC.ui.resetSave(api.bar.save);
+          JC.ui.toast(doc, t('PLG_CUSTOMIZE_CONTENT_SAVE_ERROR', 'Save error.'));
+        });
+      }
     });
   }
 
@@ -388,10 +371,13 @@ import JC from 'customize.api';
       }
       tagArea(titleEl, 'content-title', id, name);
 
-      // Image: the first image not inside the body text, or a placeholder to add one.
+      // Image: the first image not inside the body text, or a placeholder to add one. The figure
+      // sits in the item wrapper (lists) or the article container (single view), both wider than the
+      // body's parent, so search that scope or an existing image is missed and a placeholder doubled.
+      var imageScope = (itemContent && itemContent.parentElement) || body.closest('.com-content-article') || item;
       var imageArea = null;
-      if (item) {
-        var imgs = item.querySelectorAll('img');
+      if (imageScope) {
+        var imgs = imageScope.querySelectorAll('img');
         for (var k = 0; k < imgs.length; k++) {
           if (!body.contains(imgs[k])) {
             imageArea = imgs[k].closest('figure') || imgs[k];
@@ -400,18 +386,30 @@ import JC from 'customize.api';
         }
       }
 
-      if (!imageArea && item) {
+      if (!imageArea && imageScope) {
         imageArea = doc.createElement('div');
         imageArea.className = 'customize-image-placeholder';
         imageArea.textContent = t('PLG_CUSTOMIZE_CONTENT_ADD_IMAGE', 'Add image');
-        item.insertBefore(imageArea, item.firstChild);
+        // Place it just before the body branch, where the intro or full image normally renders.
+        var anchor = body;
+        while (anchor.parentElement && anchor.parentElement !== imageScope) {
+          anchor = anchor.parentElement;
+        }
+        imageScope.insertBefore(imageArea, anchor);
       }
 
       tagArea(imageArea, 'content-image', id, name);
+      // The view decides which image field it renders (full on the single article, intro on lists);
+      // carry that target so the picker saves to the field that is actually shown.
+      if (imageArea) {
+        imageArea.setAttribute('data-customize-imagetarget', body.getAttribute('data-customize-imagetarget') || 'intro');
+      }
 
-      // Details block (article info) -> properties popover. If it isn't shown on the page,
-      // surface Properties on the text area instead (the 'props' button requires this flag).
-      var detailsEl = (itemContent || item) ? (itemContent || item).querySelector('.article-info') : null;
+      // Details block (article info) -> properties popover. On the single-article view it lives in
+      // the article container, outside the body's parent; on lists it sits inside .item-content. If
+      // it isn't shown, surface Properties on the text area instead (the 'props' button needs the flag).
+      var detailsScope = itemContent || body.closest('.com-content-article') || item;
+      var detailsEl = detailsScope ? detailsScope.querySelector('.article-info') : null;
       if (detailsEl) {
         tagArea(detailsEl, 'content-props', id, name);
       } else {
