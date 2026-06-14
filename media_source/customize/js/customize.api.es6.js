@@ -246,6 +246,14 @@
       el.setAttribute('data-customize-editing', '1');
       JoomlaCustomize.emit('customize:edit-start');
 
+      // A double-click that launches this editor leaves a native text selection over the very nodes we
+      // replace below. On a cold editor load that dangling selection can wedge TinyMCE's iframe init,
+      // leaving the editor drawn but greyed out. Clear it before swapping the content for the editor.
+      try {
+        var winSel = (doc.defaultView || window).getSelection();
+        if (winSel) { winSel.removeAllRanges(); }
+      } catch (e) {}
+
       var original = el.innerHTML;
       var startHtml = (opts && typeof opts.html === 'string') ? opts.html : original;
 

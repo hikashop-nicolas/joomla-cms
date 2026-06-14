@@ -18,6 +18,22 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
 
+    // Size the stage to fill the viewport from its real top, and stop the admin page from scrolling, so
+    // the iframe (and the drag-time "move to position" drop bar fixed at its bottom) is always fully
+    // visible. Measuring the offset beats a fixed calc(): it adapts to a taller toolbar or message bar.
+    var host = document.querySelector('.customize-host');
+
+    if (host) {
+      var fitHost = function () {
+        host.style.height = Math.max(window.innerHeight - host.getBoundingClientRect().top - 12, 320) + 'px';
+      };
+
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.overflow = 'hidden';
+      fitHost();
+      window.addEventListener('resize', fitHost);
+    }
+
     // Keep the customize token fresh so a long-open editor keeps working past the token's lifetime.
     if (opts.tokenUrl && opts.tokenRefreshMs) {
       window.setInterval(function () {

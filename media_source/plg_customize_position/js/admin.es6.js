@@ -51,13 +51,14 @@ import JC from 'customize.api';
     });
   }
 
-  // --- Sticky "move to position" bar while dragging a module ------------------
-  // A blue bar appears at the bottom; dropping the module on it greys it in place and turns the bar
-  // into a position picker. (The red "remove" bar is provided generically by the engine via the
-  // module area's onDelete callback below.)
+  // --- Move a module to another position / order -----------------------------
+  // The picker (position + order dropdowns) is a popover anchored to the module itself, opened by the
+  // toolbar Move button, the keyboard Ctrl+arrows, or by dropping the module on the drag-time bottom
+  // drop zone. (The red "remove" bar is provided generically by the engine via onDelete below.)
 
   var draggedModule = null;
   var moveBar = null;
+  var picker = null;
   var pending = null;
 
   function isModuleEl(el) {
@@ -71,27 +72,42 @@ import JC from 'customize.api';
     moveBar = null;
   }
 
+  function removePicker() {
+    if (picker && picker.parentNode) {
+      picker.parentNode.removeChild(picker);
+    }
+    picker = null;
+  }
+
   function cancelMove() {
     if (pending) {
       pending.classList.remove('customize-pending');
     }
     pending = null;
     removeMoveBar();
+    removePicker();
   }
 
   function openSelector(doc, dirHint) {
-    var bar = moveBar;
-    bar.textContent = t('JGLOBAL_LOADING', 'Loading…');
-
     JC.callAction('position', 'positions', {}).then(function (res) {
+      if (!pending) {
+        return;
+      }
+
       if (!res || !res.success) {
         JC.ui.toast(doc, t('PLG_CUSTOMIZE_POSITION_LOAD_FAILED', 'Could not load positions.'));
         cancelMove();
         return;
       }
 
-      bar.textContent = '';
-      bar.classList.add('customize-sticky-form');
+      // The picker is a popover anchored to the module, not a bar at the bottom of the page.
+      var win = doc.defaultView;
+      var pop = doc.createElement('div');
+      pop.className = 'customize-popover customize-move-pop';
+      var rect = pending.getBoundingClientRect();
+      pop.style.top = (rect.top + win.scrollY) + 'px';
+      pop.style.left = (rect.left + win.scrollX) + 'px';
+      picker = pop;
 
       var currentPos = pending.getAttribute('data-customize-position');
       var movedId = pending.getAttribute('data-customize-id');
@@ -108,9 +124,6 @@ import JC from 'customize.api';
         return m.getAttribute('data-customize-position') === currentPos;
       }).indexOf(pending);
 
-      var posLabel = doc.createElement('span');
-      posLabel.textContent = t('PLG_CUSTOMIZE_POSITION_LABEL', 'Position');
-
       var posSel = doc.createElement('select');
       (res.positions || []).forEach(function (p) {
         var o = doc.createElement('option');
@@ -123,9 +136,6 @@ import JC from 'customize.api';
 
         posSel.appendChild(o);
       });
-
-      var ordLabel = doc.createElement('span');
-      ordLabel.textContent = t('PLG_CUSTOMIZE_POSITION_ORDER', 'Order');
 
       var ordSel = doc.createElement('select');
 
@@ -153,28 +163,27 @@ import JC from 'customize.api';
       fillOrder();
       posSel.addEventListener('change', fillOrder);
 
-      var save = doc.createElement('button');
-      save.type = 'button';
-      save.className = 'customize-action customize-action-save';
-      save.textContent = t('COM_MENUS_CUSTOMIZE_SAVE', 'Save');
+      pop.appendChild(JC.ui.label(doc, t('PLG_CUSTOMIZE_POSITION_LABEL', 'Position')));
+      pop.appendChild(posSel);
+      pop.appendChild(JC.ui.label(doc, t('PLG_CUSTOMIZE_POSITION_ORDER', 'Order')));
+      pop.appendChild(ordSel);
 
-      var cancel = doc.createElement('button');
-      cancel.type = 'button';
-      cancel.className = 'customize-action customize-action-cancel';
-      cancel.textContent = t('COM_MENUS_CUSTOMIZE_CANCEL', 'Cancel');
+      var bar = JC.ui.makeBar(doc);
+      pop.appendChild(bar.el);
 
-      bar.appendChild(posLabel);
-      bar.appendChild(posSel);
-      bar.appendChild(ordLabel);
-      bar.appendChild(ordSel);
-      bar.appendChild(save);
-      bar.appendChild(cancel);
+      function dismiss() {
+        var module = pending;
+        cancelMove();
 
-      cancel.addEventListener('click', cancelMove);
+        if (module && module.focus) {
+          module.focus();
+        }
+      }
 
-      save.addEventListener('click', function () {
-        save.disabled = true;
-        save.textContent = t('COM_MENUS_CUSTOMIZE_SAVING', 'Saving…');
+      bar.cancel.addEventListener('click', dismiss);
+
+      bar.save.addEventListener('click', function () {
+        JC.ui.saving(bar.save);
 
         // Insert the moved module into the target position's list at the chosen slot, then persist the
         // whole list (reorder sets each module's position + ordering, so this handles both at once).
@@ -190,20 +199,20 @@ import JC from 'customize.api';
             }
 
             pending = null;
-            moveBar = null;
+            picker = null;
             reloadFrame();
           } else {
-            save.disabled = false;
-            save.textContent = t('COM_MENUS_CUSTOMIZE_SAVE', 'Save');
+            JC.ui.resetSave(bar.save);
             var reason = (r && r.message) || t('PLG_CUSTOMIZE_POSITION_UNKNOWN_ERROR', 'unknown error');
             JC.ui.toast(doc, t('PLG_CUSTOMIZE_POSITION_SAVE_FAILED', 'Save failed: %s').replace('%s', reason));
           }
         }).catch(function () {
-          save.disabled = false;
-          save.textContent = t('COM_MENUS_CUSTOMIZE_SAVE', 'Save');
+          JC.ui.resetSave(bar.save);
           JC.ui.toast(doc, t('PLG_CUSTOMIZE_POSITION_SAVE_ERROR', 'Save error.'));
         });
       });
+
+      doc.body.appendChild(pop);
 
       // Ctrl+Left/Right opened this; pre-step the position, then focus the picker. Tab moves between the
       // two dropdowns, native arrows choose within one, Enter saves, Escape cancels.
@@ -218,18 +227,13 @@ import JC from 'customize.api';
 
       posSel.focus();
 
-      bar.addEventListener('keydown', function (e) {
+      pop.addEventListener('keydown', function (e) {
         if (e.key === 'Enter') {
           e.preventDefault();
-          save.click();
+          bar.save.click();
         } else if (e.key === 'Escape') {
           e.preventDefault();
-          var module = pending;
-          cancelMove();
-
-          if (module && module.focus) {
-            module.focus();
-          }
+          dismiss();
         }
       });
     });
@@ -261,9 +265,9 @@ import JC from 'customize.api';
       }
 
       e.preventDefault();
-      moveBar.classList.remove('customize-sticky-over');
       pending = draggedModule;
       pending.classList.add('customize-pending');
+      removeMoveBar();
       openSelector(doc);
     });
 
@@ -472,7 +476,6 @@ import JC from 'customize.api';
     }
 
     cancelMove();
-    createMoveBar(doc);
     pending = el;
     pending.classList.add('customize-pending');
     openSelector(doc, dir);
