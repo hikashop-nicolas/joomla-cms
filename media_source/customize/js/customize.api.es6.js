@@ -116,12 +116,13 @@
     /**
      * Open a core admin edit screen (article, module, menu item, ...) in a JoomlaDialog iframe
      * instead of a new tab, and refresh the preview when it closes. opts:
-     * { url, title?, checkin?, onClose? }.
+     * { url, title?, checkin?, onClose?, area? }.
      *
      * Mirrors Joomla's native modal-edit flow: the screen is opened with layout=modal, so that on
      * Save & Close / Cancel its controller redirects to the modalreturn layout, which posts a
      * (joomla:content-select | joomla:cancel) message to this window; we close on either, then run
-     * onClose. checkin releases the edit lock if the dialog is dismissed without Save/Cancel.
+     * onClose. checkin releases the edit lock if the dialog is dismissed without Save/Cancel. area is
+     * the block the dialog was opened from; focus returns to it once the refreshed preview re-renders.
      */
     openEditModal: function (opts) {
       // Resolve against the current admin page (not just the origin) so the relative "index.php"
@@ -159,6 +160,12 @@
 
           if (opts.checkin && window.Joomla && typeof window.Joomla.request === 'function') {
             window.Joomla.request({ url: opts.checkin + (token ? '&' + token + '=1' : ''), method: 'POST' });
+          }
+
+          // Return focus to the originating block once the preview reloads (read its id now, while it
+          // is still in the iframe, before onClose refreshes the frame).
+          if (opts.area && typeof JoomlaCustomize.selectAfterReload === 'function') {
+            JoomlaCustomize.selectAfterReload(opts.area);
           }
 
           if (typeof opts.onClose === 'function') {
@@ -274,6 +281,8 @@
 
         tinymce.init({
           target: ta,
+          // Move focus into the editor once it is ready, so keyboard users land inside it.
+          auto_focus: ta.id,
           license_key: 'gpl',
           promotion: false,
           menubar: false,
@@ -300,6 +309,11 @@
           height: 240
         }).then(function (eds) {
           editor = eds && eds[0];
+
+          // Belt and braces alongside auto_focus, in case the editor was created already focused-away.
+          if (editor) {
+            editor.focus();
+          }
         });
       });
 

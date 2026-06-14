@@ -480,12 +480,18 @@ document.addEventListener('DOMContentLoaded', function () {
       positionFor(el, doc);
     }
 
-    // Programmatically select an area (outline + toolbar) and pin it, so a toolbar button can navigate
-    // to another area, e.g. the view plugin's parent/child layout controls.
+    // Programmatically select an area (outline + toolbar), pin it, and move keyboard focus to it, so a
+    // toolbar button can navigate to another area, e.g. the view plugin's parent/child layout controls.
+    // Without the focus(), Tab after such a jump would restart from the top of the page.
     JC.select = function (el) {
       if (el && el.getAttribute && el.getAttribute('data-customize-type')) {
+        if (!el.hasAttribute('tabindex')) {
+          el.setAttribute('tabindex', '0');
+        }
+
         showFor(el, el.ownerDocument);
         pinned = el;
+        el.focus();
       }
     };
 
@@ -654,14 +660,13 @@ document.addEventListener('DOMContentLoaded', function () {
       setupSortable(doc);
     }
 
-    // Keyboard access: make the areas reachable and operable without a mouse. A roving tabindex keeps
-    // the page to a single Tab stop; arrows move between areas; focusing an area selects it (parity
-    // with hover); Enter/Space runs its primary action; Tab reaches the toolbar; Escape deselects.
-    // The area set is read live (plugins tag some areas, e.g. translatable strings, after load) and
-    // each area is made focusable lazily, so late-added areas are reachable too.
+    // Keyboard access: make the areas reachable and operable without a mouse. Every area is a Tab stop,
+    // so Tab walks through them in document order; focusing an area selects it (parity with hover);
+    // Enter/Space runs its primary action; Tab moves into the toolbar and on to the next area; Escape
+    // deselects; Ctrl+arrows move/reorder a block and Delete removes it. The area set is read live
+    // (plugins tag some areas after load) and each area is made focusable lazily, so late-added areas
+    // are reachable too.
     function setupKeyboard(doc) {
-      var tabStop = null;
-
       // A human label for an area: its type label plus the item name, e.g. "Layout block item".
       function describe(el) {
         var type = el.getAttribute('data-customize-type');
@@ -683,8 +688,9 @@ document.addEventListener('DOMContentLoaded', function () {
       }
 
       function ensureArea(el) {
+        // Every area is a Tab stop so a keyboard user can Tab through them in document order.
         if (!el.hasAttribute('tabindex')) {
-          el.setAttribute('tabindex', '-1');
+          el.setAttribute('tabindex', '0');
         }
 
         // Announce each area as a named, activatable "Customize area" (role=group is valid when areas
@@ -785,15 +791,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
       }
 
-      function setTabStop(el) {
-        if (tabStop && tabStop !== el) {
-          tabStop.setAttribute('tabindex', '-1');
-        }
-
-        el.setAttribute('tabindex', '0');
-        tabStop = el;
-      }
-
       function areaList() {
         return Array.prototype.slice.call(doc.querySelectorAll('[data-customize-type]'));
       }
@@ -802,19 +799,13 @@ document.addEventListener('DOMContentLoaded', function () {
       // a programmatic focus()).
       function select(el) {
         ensureArea(el);
-        setTabStop(el);
         el.focus();
         showFor(el, doc);
         pinned = el;
         announce(el);
       }
 
-      var initial = areaList();
-      initial.forEach(ensureArea);
-
-      if (initial.length) {
-        setTabStop(initial[0]);
-      }
+      areaList().forEach(ensureArea);
 
       // Focusing an area (Tab or click) selects it and keeps it selected so the toolbar is reachable.
       doc.addEventListener('focusin', function (event) {
@@ -826,7 +817,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (el) {
           ensureArea(el);
-          setTabStop(el);
           showFor(el, doc);
           pinned = el;
           announce(el);
@@ -842,8 +832,10 @@ document.addEventListener('DOMContentLoaded', function () {
         var to = event.relatedTarget;
         var inArea = to && to.closest && to.closest('[data-customize-type]');
         var inToolbar = to && toolbar && toolbar.contains(to);
+        // Focus moving into a customize popover (e.g. the Children menu, properties) is still "inside".
+        var inPopover = to && to.closest && to.closest('.customize-popover, .customize-inline-bar, .customize-sticky-zone');
 
-        if (!inArea && !inToolbar && pinned) {
+        if (!inArea && !inToolbar && !inPopover && pinned) {
           pinned = null;
           hide();
         }
@@ -867,6 +859,28 @@ document.addEventListener('DOMContentLoaded', function () {
               hide();
               area.blur();
             }
+          }
+
+          return;
+        }
+
+        // Within the toolbar, Tab past the last action moves on to the next area and Shift+Tab before
+        // the first returns to the area, so the keyboard flow is: area, its actions, next area.
+        if (toolbar && toolbar.contains(event.target) && event.key === 'Tab') {
+          var tbBtns = Array.prototype.slice.call(toolbar.querySelectorAll('.customize-btn'));
+          var tbPos = tbBtns.indexOf(event.target);
+
+          if (!event.shiftKey && tbPos === tbBtns.length - 1 && pinned) {
+            var after = areaList();
+            var nextArea = after[after.indexOf(pinned) + 1];
+
+            if (nextArea) {
+              event.preventDefault();
+              select(nextArea);
+            }
+          } else if (event.shiftKey && tbPos === 0 && pinned) {
+            event.preventDefault();
+            pinned.focus();
           }
 
           return;
@@ -912,25 +926,11 @@ document.addEventListener('DOMContentLoaded', function () {
           return;
         }
 
-        var list = areaList();
-        var idx = list.indexOf(el);
-
-        if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
-          event.preventDefault();
-
-          if (list.length) {
-            select(list[(idx + 1) % list.length]);
-          }
-        } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
-          event.preventDefault();
-
-          if (list.length) {
-            select(list[(idx - 1 + list.length) % list.length]);
-          }
-        } else if (event.key === 'Enter' || event.key === ' ') {
+        if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
           triggerPrimary(el, doc);
         } else if (event.key === 'Tab' && !event.shiftKey) {
+          // Tab from an area moves into its toolbar so the actions are reachable.
           var firstBtn = toolbar && toolbar.querySelector('.customize-btn');
 
           if (firstBtn) {
@@ -999,5 +999,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     JC.on('customize:edit-end', function () {
       editing = false;
+
+      // Return focus to the area that was being edited, so a keyboard user is not dropped to the top
+      // of the page when the editor closes (focusin re-selects it and re-shows the toolbar).
+      if (pinned && pinned.isConnected) {
+        pinned.focus();
+      }
     });
   });

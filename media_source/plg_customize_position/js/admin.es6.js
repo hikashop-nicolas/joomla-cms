@@ -93,20 +93,65 @@ import JC from 'customize.api';
       bar.textContent = '';
       bar.classList.add('customize-sticky-form');
 
-      var label = doc.createElement('span');
-      label.textContent = t('PLG_CUSTOMIZE_POSITION_LABEL', 'Position');
+      var currentPos = pending.getAttribute('data-customize-position');
+      var movedId = pending.getAttribute('data-customize-id');
 
-      var sel = doc.createElement('select');
-      var current = pending.getAttribute('data-customize-position');
+      // Modules on the page in a position, in render order, excluding the one being moved.
+      function modulesIn(pos) {
+        return Array.prototype.filter.call(doc.querySelectorAll('[data-customize-type="module"]'), function (m) {
+          return m !== pending && m.getAttribute('data-customize-position') === pos;
+        });
+      }
+
+      // The module's current slot in its own position, so "no change" is the default order.
+      var currentIndex = Array.prototype.filter.call(doc.querySelectorAll('[data-customize-type="module"]'), function (m) {
+        return m.getAttribute('data-customize-position') === currentPos;
+      }).indexOf(pending);
+
+      var posLabel = doc.createElement('span');
+      posLabel.textContent = t('PLG_CUSTOMIZE_POSITION_LABEL', 'Position');
+
+      var posSel = doc.createElement('select');
       (res.positions || []).forEach(function (p) {
         var o = doc.createElement('option');
         o.value = p;
         o.textContent = p;
-        if (p === current) {
+
+        if (p === currentPos) {
           o.selected = true;
         }
-        sel.appendChild(o);
+
+        posSel.appendChild(o);
       });
+
+      var ordLabel = doc.createElement('span');
+      ordLabel.textContent = t('PLG_CUSTOMIZE_POSITION_ORDER', 'Order');
+
+      var ordSel = doc.createElement('select');
+
+      // (Re)build the order options for the chosen position: "At the top", then "After <module>".
+      function fillOrder() {
+        ordSel.textContent = '';
+
+        var mods = modulesIn(posSel.value);
+        var top = doc.createElement('option');
+        top.value = '0';
+        top.textContent = t('PLG_CUSTOMIZE_POSITION_ORDER_TOP', 'At the top');
+        ordSel.appendChild(top);
+
+        mods.forEach(function (m, i) {
+          var o = doc.createElement('option');
+          o.value = String(i + 1);
+          o.textContent = t('PLG_CUSTOMIZE_POSITION_ORDER_AFTER', 'After %s')
+            .replace('%s', m.getAttribute('data-customize-name') || m.getAttribute('data-customize-id') || '');
+          ordSel.appendChild(o);
+        });
+
+        ordSel.value = posSel.value === currentPos ? String(currentIndex) : String(mods.length);
+      }
+
+      fillOrder();
+      posSel.addEventListener('change', fillOrder);
 
       var save = doc.createElement('button');
       save.type = 'button';
@@ -118,8 +163,10 @@ import JC from 'customize.api';
       cancel.className = 'customize-action customize-action-cancel';
       cancel.textContent = t('COM_MENUS_CUSTOMIZE_CANCEL', 'Cancel');
 
-      bar.appendChild(label);
-      bar.appendChild(sel);
+      bar.appendChild(posLabel);
+      bar.appendChild(posSel);
+      bar.appendChild(ordLabel);
+      bar.appendChild(ordSel);
       bar.appendChild(save);
       bar.appendChild(cancel);
 
@@ -129,11 +176,17 @@ import JC from 'customize.api';
         save.disabled = true;
         save.textContent = t('COM_MENUS_CUSTOMIZE_SAVING', 'Saving…');
 
-        JC.callAction('position', 'move', { id: pending.getAttribute('data-customize-id'), position: sel.value }).then(function (r) {
+        // Insert the moved module into the target position's list at the chosen slot, then persist the
+        // whole list (reorder sets each module's position + ordering, so this handles both at once).
+        var pos = posSel.value;
+        var ids = modulesIn(pos).map(function (m) { return m.getAttribute('data-customize-id'); });
+        ids.splice(parseInt(ordSel.value, 10) || 0, 0, movedId);
+
+        JC.callAction('position', 'reorder', { position: pos, order: ids }).then(function (r) {
           if (r && r.success) {
-            // Keep the keyboard user on the module once the frame re-renders in its new position.
+            // Keep the keyboard user on the module once the frame re-renders in its new spot.
             if (JC.selectAfterReload) {
-              JC.selectAfterReload(pending, t('COM_MENUS_CUSTOMIZE_AREA_MOVED_TO', 'Moved to %s').replace('%s', sel.value));
+              JC.selectAfterReload(pending, t('COM_MENUS_CUSTOMIZE_AREA_MOVED_TO', 'Moved to %s').replace('%s', pos));
             }
 
             pending = null;
@@ -152,17 +205,18 @@ import JC from 'customize.api';
         });
       });
 
-      // Keyboard operation: pre-step the selection (Ctrl+Left/Right opened this), focus the picker, and
-      // let arrows/Ctrl+arrows choose, Enter save, Escape cancel.
+      // Ctrl+Left/Right opened this; pre-step the position, then focus the picker. Tab moves between the
+      // two dropdowns, native arrows choose within one, Enter saves, Escape cancels.
       if (dirHint) {
-        var count = sel.options.length;
+        var count = posSel.options.length;
 
         if (count) {
-          sel.selectedIndex = (sel.selectedIndex + dirHint + count) % count;
+          posSel.selectedIndex = (posSel.selectedIndex + dirHint + count) % count;
+          fillOrder();
         }
       }
 
-      sel.focus();
+      posSel.focus();
 
       bar.addEventListener('keydown', function (e) {
         if (e.key === 'Enter') {
@@ -175,13 +229,6 @@ import JC from 'customize.api';
 
           if (module && module.focus) {
             module.focus();
-          }
-        } else if (e.ctrlKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
-          e.preventDefault();
-          var len = sel.options.length;
-
-          if (len) {
-            sel.selectedIndex = (sel.selectedIndex + (e.key === 'ArrowLeft' ? -1 : 1) + len) % len;
           }
         }
       });
@@ -417,6 +464,20 @@ import JC from 'customize.api';
 
   buildAddModule();
 
+  // Open the "move to position" picker for a module. Shared by the keyboard Ctrl+arrows, the drag
+  // move-bar, and the toolbar Move button. dir optionally pre-steps the position selection.
+  function startMove(el, doc, dir) {
+    if (!isModuleEl(el)) {
+      return;
+    }
+
+    cancelMove();
+    createMoveBar(doc);
+    pending = el;
+    pending.classList.add('customize-pending');
+    openSelector(doc, dir);
+  }
+
   // Declare modules sortable; the engine handles the drag mechanics and calls onReorder on drop
   // onto another module or an empty-position drop zone, and onDelete for the engine's remove bar.
   JC.registerAreaType('module', {
@@ -432,18 +493,9 @@ import JC from 'customize.api';
       info.dragged.setAttribute('data-customize-position', position);
       saveOrder(info.doc, position);
     },
-    // Keyboard "send to position": Ctrl+Left/Right opens the same picker the drag move-bar uses, with
-    // the full list of template positions (not only those currently on the page).
+    // Keyboard "send to position" (Ctrl+Left/Right) opens the same picker as the Move toolbar button.
     onMove: function (info) {
-      if (!isModuleEl(info.el)) {
-        return;
-      }
-
-      cancelMove();
-      createMoveBar(info.doc);
-      pending = info.el;
-      pending.classList.add('customize-pending');
-      openSelector(info.doc, info.dir);
+      startMove(info.el, info.doc, info.dir);
     },
     onDelete: function (info) {
       return JC.callAction('position', 'delete', { id: info.el.getAttribute('data-customize-id') }).then(function (res) {
@@ -458,5 +510,16 @@ import JC from 'customize.api';
         JC.ui.toast(info.doc, t('PLG_CUSTOMIZE_POSITION_SAVE_ERROR', 'Save error.'));
         return false;
       });
+    }
+  });
+
+  // A visible, Tab-reachable alternative to the (OS-conflicting) Ctrl+arrow move shortcut: open the
+  // position picker from the module's toolbar.
+  JC.registerButton('module', {
+    id: 'move',
+    label: t('PLG_CUSTOMIZE_POSITION_BTN_MOVE', 'Move'),
+    order: 70,
+    onClick: function (ctx) {
+      startMove(ctx.el, ctx.doc, 0);
     }
   });

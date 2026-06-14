@@ -141,6 +141,7 @@ import JC from 'customize.api';
 
   function openModuleEditor(ctx) {
     JC.openEditModal({
+      area: ctx.el,
       url: 'index.php?option=com_modules&view=module&layout=modal&id=' + encodeURIComponent(ctx.data.id),
       title: t('PLG_CUSTOMIZE_MODULE_BTN_ADVANCED', 'Advanced'),
       checkin: 'index.php?option=com_modules&task=modules.checkin&format=json&cid[]=' + encodeURIComponent(ctx.data.id),
@@ -160,6 +161,7 @@ import JC from 'customize.api';
     }).then(function (res) {
       if (res && res.success && res.url) {
         JC.openEditModal({
+          area: ctx.el,
           url: res.url,
           title: t('PLG_CUSTOMIZE_MODULE_BTN_LAYOUT', 'Edit layout'),
           onClose: reloadFrame
@@ -218,6 +220,7 @@ import JC from 'customize.api';
 
   function openMenuItemEditor(ctx) {
     JC.openEditModal({
+      area: ctx.el,
       url: 'index.php?option=com_menus&view=item&layout=modal&id=' + encodeURIComponent(ctx.data.id),
       title: t('PLG_CUSTOMIZE_MODULE_BTN_ADVANCED', 'Advanced'),
       checkin: 'index.php?option=com_menus&task=items.checkin&format=json&cid[]=' + encodeURIComponent(ctx.data.id),

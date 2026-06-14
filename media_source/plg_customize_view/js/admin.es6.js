@@ -204,6 +204,9 @@ import JC from 'customize.api';
   // to the chosen one.
   function showChildren(ctx) {
     var doc = ctx.doc;
+    var win = doc.defaultView;
+    // Remember what had focus (the Children button) so Escape/Tab can return there.
+    var trigger = doc.activeElement;
     var existing = doc.getElementById('customize-view-children');
 
     if (existing) {
@@ -219,22 +222,41 @@ import JC from 'customize.api';
     var menu = doc.createElement('div');
     menu.id = 'customize-view-children';
     menu.className = 'customize-popover';
+    menu.setAttribute('role', 'menu');
+    menu.setAttribute('aria-label', t('PLG_CUSTOMIZE_VIEW_CHILDREN', 'Children'));
 
-    var win = doc.defaultView;
     var rect = ctx.el.getBoundingClientRect();
     menu.style.top = (rect.top + win.scrollY) + 'px';
     menu.style.left = (rect.left + win.scrollX) + 'px';
+
+    function closeMenu(restoreFocus) {
+      menu.remove();
+      doc.removeEventListener('click', dismiss);
+
+      if (restoreFocus && trigger && trigger.isConnected) {
+        trigger.focus();
+      }
+    }
+
+    function dismiss(ev) {
+      if (!menu.contains(ev.target)) {
+        closeMenu(false);
+      }
+    }
 
     items.forEach(function (it) {
       var btn = doc.createElement('button');
       btn.type = 'button';
       btn.className = 'customize-menu-item';
+      btn.setAttribute('role', 'menuitem');
+      // Roving: items are reached with the arrow keys, not Tab.
+      btn.tabIndex = -1;
       btn.textContent = it.name;
       // Indent by depth so the subtree's nesting is legible.
       btn.style.paddingLeft = (8 + (it.depth - 1) * 14) + 'px';
       btn.addEventListener('click', function (ev) {
         ev.stopPropagation();
-        menu.remove();
+        closeMenu(false);
 
         if (JC.select) {
           JC.select(it.el);
@@ -243,16 +265,41 @@ import JC from 'customize.api';
       menu.appendChild(btn);
     });
 
+    // Arrow keys move between items; Enter/Space activate (native button); Escape/Tab close and return.
+    menu.addEventListener('keydown', function (ev) {
+      var btns = Array.prototype.slice.call(menu.querySelectorAll('.customize-menu-item'));
+      var idx = btns.indexOf(doc.activeElement);
+
+      if (ev.key === 'ArrowDown') {
+        ev.preventDefault();
+        btns[(idx + 1) % btns.length].focus();
+      } else if (ev.key === 'ArrowUp') {
+        ev.preventDefault();
+        btns[(idx - 1 + btns.length) % btns.length].focus();
+      } else if (ev.key === 'Home') {
+        ev.preventDefault();
+        btns[0].focus();
+      } else if (ev.key === 'End') {
+        ev.preventDefault();
+        btns[btns.length - 1].focus();
+      } else if (ev.key === 'Escape' || ev.key === 'Tab') {
+        ev.preventDefault();
+        closeMenu(true);
+      }
+    });
+
     doc.body.appendChild(menu);
 
-    // Dismiss on the next click outside the menu.
+    // Open with the first item focused so the keyboard lands inside the menu.
+    var first = menu.querySelector('.customize-menu-item');
+
+    if (first) {
+      first.focus();
+    }
+
+    // Dismiss on a click outside (deferred so the opening click doesn't immediately close it).
     win.setTimeout(function () {
-      doc.addEventListener('click', function dismiss(ev) {
-        if (!menu.contains(ev.target)) {
-          menu.remove();
-          doc.removeEventListener('click', dismiss);
-        }
-      });
+      doc.addEventListener('click', dismiss);
     }, 0);
   }
 
@@ -270,6 +317,7 @@ import JC from 'customize.api';
     }).then(function (res) {
       if (res && res.success && res.url) {
         JC.openEditModal({
+          area: ctx.el,
           url: res.url,
           title: t('PLG_CUSTOMIZE_VIEW_BTN_EDIT', 'Edit layout'),
           onClose: JC.reloadFrame

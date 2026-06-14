@@ -348,6 +348,7 @@ import JC from 'customize.api';
 
   function openArticleEditor(ctx) {
     JC.openEditModal({
+      area: ctx.el,
       url: 'index.php?option=com_content&view=article&layout=modal&id=' + encodeURIComponent(ctx.data.id),
       title: t('PLG_CUSTOMIZE_CONTENT_BTN_ADVANCED', 'Advanced'),
       checkin: 'index.php?option=com_content&task=articles.checkin&format=json&cid[]=' + encodeURIComponent(ctx.data.id),
