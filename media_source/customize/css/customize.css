@@ -98,3 +98,92 @@
 .customize-hidden {
   display: none !important;
 }
+
+/* Popovers + their controls when opened in the admin host (e.g. the template "Add position" panel
+   control). The same classes are styled for the iframe in customize-frame.css; the host needs them
+   too so JC.ui.popover is positioned and styled here. */
+.customize-popover {
+  position: absolute;
+  z-index: 100000;
+  width: 260px;
+  padding: 10px 12px;
+  font: 13px sans-serif;
+  color: #212529;
+  background: #fff;
+  border: 1px solid #2a7de1;
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .25);
+}
+
+.customize-popover select,
+.customize-popover input[type="text"] {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 2px 0 4px;
+}
+
+.customize-field-label {
+  margin-top: 6px;
+  font-weight: 600;
+}
+
+.customize-inline-bar {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0 0;
+}
+
+.customize-action {
+  padding: 4px 12px;
+  font: 13px sans-serif;
+  color: #fff;
+  cursor: pointer;
+  border: 0;
+  border-radius: 3px;
+}
+
+.customize-action-save {
+  background: #198754;
+}
+
+.customize-action-cancel {
+  background: #6c757d;
+}
+
+.customize-toast {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  z-index: 100001;
+  padding: 8px 14px;
+  font: 13px sans-serif;
+  color: #fff;
+  background: #212529;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .3);
+  transform: translateX(-50%);
+}
+
+/* Layout plugin: the "Hidden blocks" restore list in the admin panel. */
+.customize-layout-panel {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: #fff;
+  border: 1px solid #d7dce3;
+  border-radius: 4px;
+}
+
+.customize-layout-panel .customize-field-label {
+  margin-bottom: 6px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.customize-layout-hidden-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 0;
+  color: #1a1a1a;
+}

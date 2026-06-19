@@ -77,7 +77,60 @@
         .then(function (text) {
           // Be resilient to stray output (PHP notices, BOM) prepended to the JSON body.
           var json = JoomlaCustomize._parseJson(text);
-          var data = json && json.data ? json.data : [];
+
+          // A non-JSON body (login redirect) or a request-level rejection means the admin session
+          // expired; the plugin also flags its own token rejection with authExpired.
+          if (json === null || json.success === false) {
+            return JoomlaCustomize._sessionExpired();
+          }
+
+          var data = json.data ? json.data : [];
+          var first = Array.isArray(data) ? data[0] : data;
+
+          if (typeof first === 'string') {
+            first = JoomlaCustomize._parseJson(first) || first;
+          }
+
+          if (first && first.authExpired) {
+            return JoomlaCustomize._sessionExpired();
+          }
+
+          return first;
+        });
+    },
+
+    /**
+     * Call a template-scoped customize action on com_templates (no plugin needed). Posts the active
+     * style id from the options so the server knows which template/style to act on. Resolves with the
+     * parsed handler result ({ success, ... }).
+     */
+    templateAction: function (action, payload) {
+      var opts = options();
+      var url = 'index.php?option=com_templates&task=ajax.customize&format=json';
+      var body = new FormData();
+
+      body.append('action', action);
+      body.append('payload', JSON.stringify(payload || {}));
+      body.append('id', opts.styleId || '');
+
+      if (opts.token) {
+        body.append(opts.token, '1');
+      }
+
+      return fetch(url, { method: 'POST', body: body, credentials: 'same-origin' })
+        .then(function (response) {
+          return response.text();
+        })
+        .then(function (text) {
+          var json = JoomlaCustomize._parseJson(text);
+
+          // A non-JSON body (the request was redirected to the admin login) or a request-level
+          // rejection (invalid token / not authorised) means the admin session has expired.
+          if (json === null || json.success === false) {
+            return JoomlaCustomize._sessionExpired();
+          }
+
+          var data = json.data ? json.data : json;
           var first = Array.isArray(data) ? data[0] : data;
 
           if (typeof first === 'string') {
@@ -86,6 +139,24 @@
 
           return first;
         });
+    },
+
+    /**
+     * Whether the admin session has expired this session (so server actions can no longer be saved).
+     */
+    sessionExpired: false,
+
+    /**
+     * Record that the admin session has expired: announce it once (the engine shows a re-login notice)
+     * and return a result the callers recognise as a failed, non-retryable save.
+     */
+    _sessionExpired: function () {
+      if (!JoomlaCustomize.sessionExpired) {
+        JoomlaCustomize.sessionExpired = true;
+        JoomlaCustomize.emit('customize:session-expired', {});
+      }
+
+      return { success: false, sessionExpired: true };
     },
 
     /**
@@ -211,6 +282,12 @@
      * token so a long session that outlived the original one still loads in customize mode.
      */
     reloadFrame: function () {
+      // Once the session has expired, reloading the preview can't recover (it would just drop the
+      // customize overlay once the token lapses too); leave it in place so the re-login notice shows.
+      if (JoomlaCustomize.sessionExpired) {
+        return;
+      }
+
       var frame = window.document.getElementById(options().frameId || 'customize-frame');
 
       if (!frame) {
@@ -307,7 +384,7 @@
           setup: function (editor) {
             editor.ui.registry.addButton('customizeimage', {
               icon: 'image',
-              tooltip: JoomlaCustomize.text('COM_MENUS_CUSTOMIZE_INSERT_IMAGE', 'Insert image'),
+              tooltip: JoomlaCustomize.text('COM_TEMPLATES_CUSTOMIZE_INSERT_IMAGE', 'Insert image'),
               onAction: function () {
                 JoomlaCustomize._mediaPicker(function (url) {
                   editor.insertContent('<img src="' + url.replace(/"/g, '%22') + '" alt="">');
@@ -439,6 +516,8 @@
       toast: function (doc, message) {
         var note = doc.createElement('div');
         note.className = 'customize-toast';
+        // role=status (implicit aria-live=polite) so saves/failures are announced to screen readers.
+        note.setAttribute('role', 'status');
         note.textContent = message;
         doc.body.appendChild(note);
         doc.defaultView.setTimeout(function () {
@@ -462,12 +541,12 @@
         var save = doc.createElement('button');
         save.type = 'button';
         save.className = 'customize-action customize-action-save';
-        save.textContent = JoomlaCustomize.text('COM_MENUS_CUSTOMIZE_SAVE', 'Save');
+        save.textContent = JoomlaCustomize.text('COM_TEMPLATES_CUSTOMIZE_SAVE', 'Save');
 
         var cancel = doc.createElement('button');
         cancel.type = 'button';
         cancel.className = 'customize-action customize-action-cancel';
-        cancel.textContent = JoomlaCustomize.text('COM_MENUS_CUSTOMIZE_CANCEL', 'Cancel');
+        cancel.textContent = JoomlaCustomize.text('COM_TEMPLATES_CUSTOMIZE_CANCEL', 'Cancel');
 
         el.appendChild(save);
         el.appendChild(cancel);
@@ -477,12 +556,12 @@
 
       saving: function (button) {
         button.disabled = true;
-        button.textContent = JoomlaCustomize.text('COM_MENUS_CUSTOMIZE_SAVING', 'Saving…');
+        button.textContent = JoomlaCustomize.text('COM_TEMPLATES_CUSTOMIZE_SAVING', 'Saving…');
       },
 
       resetSave: function (button) {
         button.disabled = false;
-        button.textContent = JoomlaCustomize.text('COM_MENUS_CUSTOMIZE_SAVE', 'Save');
+        button.textContent = JoomlaCustomize.text('COM_TEMPLATES_CUSTOMIZE_SAVE', 'Save');
       },
 
       /**
@@ -509,6 +588,11 @@
 
         var box = doc.createElement('div');
         box.className = 'customize-popover' + (opts.className ? ' ' + opts.className : '');
+        box.setAttribute('role', 'dialog');
+
+        if (opts.ariaLabel) {
+          box.setAttribute('aria-label', opts.ariaLabel);
+        }
 
         if (opts.anchor && opts.anchor.getBoundingClientRect) {
           var rect = opts.anchor.getBoundingClientRect();
@@ -558,6 +642,10 @@
           });
         }
 
+        var focusables = function () {
+          return box.querySelectorAll('a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])');
+        };
+
         box.addEventListener('keydown', function (e) {
           if (e.key === 'Escape') {
             e.preventDefault();
@@ -565,10 +653,47 @@
           } else if (opts.saveOnEnter && e.key === 'Enter') {
             e.preventDefault();
             bar.save.click();
+          } else if (e.key === 'Tab') {
+            // Trap focus within the popover so keyboard users do not Tab out to the page behind it.
+            var items = focusables();
+
+            if (!items.length) {
+              return;
+            }
+
+            var first = items[0];
+            var last = items[items.length - 1];
+
+            if (e.shiftKey && doc.activeElement === first) {
+              e.preventDefault();
+              last.focus();
+            } else if (!e.shiftKey && doc.activeElement === last) {
+              e.preventDefault();
+              first.focus();
+            }
           }
         });
 
         doc.body.appendChild(box);
+
+        // Keep the popover within the visible viewport, so it never opens off-screen (e.g. anchored to
+        // the bottom edge of a tall region). Done after appending, once it has measurable dimensions.
+        if (box.style.top) {
+          var margin = 8;
+          var maxLeft = win.scrollX + win.innerWidth - box.offsetWidth - margin;
+          var maxTop = win.scrollY + win.innerHeight - box.offsetHeight - margin;
+          box.style.left = Math.max(win.scrollX + margin, Math.min(parseFloat(box.style.left) || 0, maxLeft)) + 'px';
+          box.style.top = Math.max(win.scrollY + margin, Math.min(parseFloat(box.style.top) || 0, maxTop)) + 'px';
+        }
+
+        // Move focus into the popover (the first control, which is a content field/button since the
+        // Save/Cancel bar is appended last), so keyboard users land in it instead of behind it.
+        var firstFocusable = focusables()[0];
+
+        if (firstFocusable) {
+          firstFocusable.focus();
+        }
+
         off = JoomlaCustomize.registerTransient(function () { close(); });
 
         return { el: box, bar: bar, close: close };

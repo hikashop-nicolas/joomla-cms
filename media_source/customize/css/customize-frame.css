@@ -45,6 +45,13 @@
   gap: .25rem;
 }
 
+/* When the element is at the top of the page, the toolbar drops below it instead of above. */
+.customize-toolbar.customize-toolbar-below {
+  transform: translateY(0);
+  border-radius: 0 0 3px 3px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .2);
+}
+
 .customize-toolbar-label {
   display: flex;
   align-items: center;
@@ -226,6 +233,19 @@
   outline-offset: -2px;
 }
 
+/* A stable visible slot for an empty position (added by the layout plugin), so it can be grabbed and
+   used as a drop target. It is sized up-front rather than at drag time: growing a block when a drag
+   starts reflows the page and shifts the drag source, which aborts the native drag. */
+.customize-block-empty {
+  display: block;
+  min-height: 34px;
+  padding: 9px 8px 9px 36px;
+  font: 12px sans-serif;
+  color: #6c9fe0;
+  border: 1px dashed #cfe0f5;
+  border-radius: 3px;
+}
+
 /* The target currently under the pointer (stronger blue). */
 .customize-drop-target {
   outline: 2px dashed #2a7de1;
@@ -245,7 +265,22 @@
   border-radius: 3px;
 }
 
-.customize-empty-position.customize-dropzone-active {
+.customize-empty-position.customize-dropzone-active,
+.customize-empty-position-shown {
+  display: block;
+}
+
+/* In "show all positions" mode the empty markers are shown at all times (not just during a drag), so
+   the editor sees the full position map. A subtler tint than the active drop target. */
+.customize-empty-position-shown {
+  background: rgba(158, 197, 240, .12);
+}
+
+/* A split's empty sub-position always shows its slot, even in "used positions" mode: the split is a
+   deliberate structure (so its empty column/row should read as intentional, not missing), and the slot
+   stays a reachable drop target for reordering cells or dropping a module in. Shown up-front rather than
+   at drag time, so it never grows mid-grab and aborts a native drag. */
+.customize-split-cell .customize-empty-position {
   display: block;
 }
 
@@ -344,4 +379,182 @@
   background: #f8d7da;
   border: 1px solid #dc3545;
   border-radius: 4px;
+}
+
+/* Template ratio drag handles (Cassiopeia): a grab bar on a sidebar's component-facing edge. */
+.container-sidebar-left,
+.container-sidebar-right {
+  position: relative;
+}
+
+.customize-region-boundary {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  z-index: 6;
+  cursor: col-resize;
+  background: rgba(42, 125, 225, .12);
+  border-radius: 3px;
+  touch-action: none;
+}
+
+.customize-region-boundary:hover {
+  background: rgba(42, 125, 225, .28);
+}
+
+/* Keyboard focus on either resize separator (window-splitter): clearly visible, since they are now
+   focusable and arrow-key operable. */
+.customize-region-boundary:focus-visible,
+.customize-split-resize:focus-visible {
+  background: rgba(42, 125, 225, .4);
+  outline: 2px solid #2a7de1;
+  outline-offset: 1px;
+}
+
+.customize-region-boundary::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2px;
+  height: 30px;
+  transform: translate(-50%, -50%);
+  background: #2a7de1;
+  border-radius: 2px;
+}
+
+.customize-region-boundary[data-customize-edge="left"] {
+  right: -6px;
+}
+
+.customize-region-boundary[data-customize-edge="right"] {
+  left: -6px;
+}
+
+/* Layout plugin: a dedicated grip to grab a movable block (which may wrap other customize areas, so
+   it cannot be grabbed by hovering its body). Shown while the block is hovered or selected. Split
+   cells reuse the same grip to reorder them within their split. */
+[data-customize-type="layout-block"],
+[data-customize-type="split-cell"] {
+  position: relative;
+}
+
+.customize-block-grip {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 60;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  font-size: 15px;
+  line-height: 24px;
+  text-align: center;
+  color: #fff;
+  cursor: grab;
+  background: #2a3a5e;
+  border: 1px solid #16203a;
+  border-radius: 4px;
+  display: none;
+}
+
+[data-customize-type="layout-block"]:hover > .customize-block-grip,
+[data-customize-type="layout-block"].customize-area-active > .customize-block-grip,
+[data-customize-type="split-cell"]:hover > .customize-block-grip,
+[data-customize-type="split-cell"].customize-area-active > .customize-block-grip,
+.customize-block-grip:focus {
+  display: block;
+}
+
+.customize-block-grip:active {
+  cursor: grabbing;
+}
+
+/* Draggable separator between two split columns: a thin vertical bar sitting in the gap, dragged to
+   resize the adjacent cells. Mirrors the sidebar ratio handle, but here it is generic (any split).
+   Only column splits get one; rows size to their content. */
+.customize-split-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -0.5rem;
+  z-index: 6;
+  width: 12px;
+  cursor: col-resize;
+  background: rgba(42, 125, 225, .12);
+  border-radius: 3px;
+  touch-action: none;
+}
+
+.customize-split-resize:hover {
+  background: rgba(42, 125, 225, .28);
+}
+
+.customize-split-resize::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2px;
+  height: 30px;
+  background: #2a7de1;
+  border-radius: 2px;
+  transform: translate(-50%, -50%);
+}
+
+/* Split-position chooser (popover, in the preview). The popover's Save button is hidden since picking
+   a layout acts immediately. */
+.customize-split-pop .customize-action-save {
+  display: none;
+}
+
+.customize-split-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.customize-split-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  padding: 6px;
+  color: #333;
+  cursor: pointer;
+  background: #fff;
+  border: 1px solid #cfe0f5;
+  border-radius: 4px;
+}
+
+.customize-split-choice:hover {
+  background: #f0f6ff;
+  border-color: #2a7de1;
+}
+
+.customize-split-diagram {
+  display: flex;
+  gap: 2px;
+  width: 52px;
+  height: 26px;
+}
+
+.customize-split-diagram.is-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.customize-split-diagram.is-rows {
+  flex-direction: column;
+}
+
+.customize-split-diagram > span {
+  flex-basis: 0;
+  background: #9ec5f0;
+  border-radius: 2px;
+}
+
+.customize-split-choice-label {
+  font: 11px sans-serif;
 }

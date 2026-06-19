@@ -34,6 +34,14 @@ document.addEventListener('DOMContentLoaded', function () {
       window.addEventListener('resize', fitHost);
     }
 
+    // When the admin session has expired, the iframe can still be hovered while the customize token
+    // lasts, but nothing can be saved. Send the editor to the login: re-requesting this admin URL makes
+    // Joomla redirect to the login with a return back here, so signing in brings them straight back to
+    // where they were. A standard login page is also clearer for assistive tech than an in-page banner.
+    JC.on('customize:session-expired', function () {
+      window.location.reload();
+    });
+
     // Keep the customize token fresh so a long-open editor keeps working past the token's lifetime.
     if (opts.tokenUrl && opts.tokenRefreshMs) {
       window.setInterval(function () {
@@ -45,6 +53,9 @@ document.addEventListener('DOMContentLoaded', function () {
           .then(function (json) {
             if (json && json.data && json.data.token) {
               JC.setFrameToken(json.data.token);
+            } else if (json && json.success === false) {
+              // The token endpoint rejected us (no longer authorised): the session has expired.
+              JC._sessionExpired();
             }
           })
           .catch(function () {});
@@ -171,17 +182,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
       var name = pendingDelete.getAttribute('data-customize-name') || '';
       var label = doc.createElement('span');
-      label.textContent = JC.text('COM_MENUS_CUSTOMIZE_REMOVE_CONFIRM', 'Remove %s?').replace('%s', name);
+      label.textContent = JC.text('COM_TEMPLATES_CUSTOMIZE_REMOVE_CONFIRM', 'Remove %s?').replace('%s', name);
 
       var del = doc.createElement('button');
       del.type = 'button';
       del.className = 'customize-action customize-action-danger';
-      del.textContent = JC.text('COM_MENUS_CUSTOMIZE_REMOVE', 'Remove');
+      del.textContent = JC.text('COM_TEMPLATES_CUSTOMIZE_REMOVE', 'Remove');
 
       var cancel = doc.createElement('button');
       cancel.type = 'button';
       cancel.className = 'customize-action customize-action-cancel';
-      cancel.textContent = JC.text('COM_MENUS_CUSTOMIZE_CANCEL', 'Cancel');
+      cancel.textContent = JC.text('COM_TEMPLATES_CUSTOMIZE_CANCEL', 'Cancel');
 
       bar.appendChild(label);
       bar.appendChild(del);
@@ -192,12 +203,12 @@ document.addEventListener('DOMContentLoaded', function () {
       del.addEventListener('click', function () {
         var target = pendingDelete;
         del.disabled = true;
-        del.textContent = JC.text('COM_MENUS_CUSTOMIZE_SAVING', 'Saving…');
+        del.textContent = JC.text('COM_TEMPLATES_CUSTOMIZE_SAVING', 'Saving…');
 
         Promise.resolve(areaType.onDelete({ el: target, doc: doc })).then(function (ok) {
           if (ok === false) {
             del.disabled = false;
-            del.textContent = JC.text('COM_MENUS_CUSTOMIZE_REMOVE', 'Remove');
+            del.textContent = JC.text('COM_TEMPLATES_CUSTOMIZE_REMOVE', 'Remove');
           } else {
             // The plugin reloads the iframe on success; just drop our references.
             pendingDelete = null;
@@ -210,7 +221,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function makeRemoveBar(doc, areaType) {
       var bar = doc.createElement('div');
       bar.className = 'customize-sticky-zone customize-sticky-zone-top customize-sticky-danger';
-      bar.textContent = JC.text('COM_MENUS_CUSTOMIZE_REMOVE_HINT', 'Drop here to remove');
+      bar.textContent = JC.text('COM_TEMPLATES_CUSTOMIZE_REMOVE_HINT', 'Drop here to remove');
 
       bar.addEventListener('dragover', function (e) {
         if (dragEl) {
@@ -342,23 +353,60 @@ document.addEventListener('DOMContentLoaded', function () {
           return;
         }
 
+        var def = JC.getAreaType(dragType);
+
+        // Some types (e.g. split cells) only reorder among siblings of one container; never let a drag
+        // land in a different container (which would move the element out of its own group).
+        if (def && def.sameParentOnly && dragEl.parentNode !== target.parentNode) {
+          return;
+        }
+
         e.preventDefault();
 
         if (target.hasAttribute('data-customize-dropzone')) {
           target.parentNode.insertBefore(dragEl, target);
         } else {
           var rect = target.getBoundingClientRect();
-          var after = (e.clientY - rect.top) > (rect.height / 2);
-          target.parentNode.insertBefore(dragEl, after ? target.nextSibling : target);
-        }
+          // Insert before/after the target along the container's main axis: horizontal for a flex row
+          // (or grid), so side-by-side columns reorder correctly; vertical otherwise.
+          var horizontal = false;
 
-        var def = JC.getAreaType(dragType);
+          try {
+            var pcs = doc.defaultView.getComputedStyle(target.parentNode);
+            horizontal = (pcs.display.indexOf('flex') !== -1 && pcs.flexDirection.indexOf('row') === 0)
+              || pcs.display.indexOf('grid') !== -1;
+          } catch (err) {
+            // computed style unavailable; fall back to vertical
+          }
+
+          var after = horizontal
+            ? (e.clientX - rect.left) > (rect.width / 2)
+            : (e.clientY - rect.top) > (rect.height / 2);
+          var ref = after ? target.nextSibling : target;
+
+          // If that side leaves the element where it already is (the target is the dragged element's
+          // own neighbour), use the other side, so dropping onto a neighbour always reorders instead of
+          // silently doing nothing (which would then save the unchanged order).
+          if (ref === dragEl || ref === dragEl.nextSibling) {
+            ref = after ? target : target.nextSibling;
+          }
+
+          target.parentNode.insertBefore(dragEl, ref);
+        }
 
         if (def && typeof def.onReorder === 'function') {
           def.onReorder({ dragged: dragEl, target: target, doc: doc, type: dragType });
         }
       });
     }
+
+    // Expose the drag-handle wiring so a plugin can make its own element (e.g. a dedicated grip on a
+    // layout block that nests other areas) start a drag-to-reorder, reusing the same drop targets,
+    // remove bar and onReorder dispatch as the toolbar handle. Re-assigned per frame load, so callers
+    // use it from the customize:frame-ready handler for the current document.
+    JC.makeDragHandle = function (handle, el, doc) {
+      makeDragHandle(handle, el, doc);
+    };
 
     // Let a control outside the iframe (e.g. the Add-module bar in the panel) drag a brand new
     // element of `type` onto the page. Highlights the same drop targets as a reorder; onDrop is
@@ -413,7 +461,12 @@ document.addEventListener('DOMContentLoaded', function () {
       var win = doc.defaultView;
       var rect = el.getBoundingClientRect();
 
-      toolbar.style.top = (rect.top + win.scrollY) + 'px';
+      // The toolbar sits above the element; if the element is too close to the top of the viewport the
+      // toolbar would be clipped, so drop it just below the element instead.
+      var below = rect.top < (toolbar.offsetHeight || 28) + 2;
+      toolbar.classList.toggle('customize-toolbar-below', below);
+
+      toolbar.style.top = ((below ? rect.bottom : rect.top) + win.scrollY) + 'px';
       toolbar.style.left = (rect.left + win.scrollX) + 'px';
     }
 
@@ -524,14 +577,28 @@ document.addEventListener('DOMContentLoaded', function () {
     function triggerPrimary(el, doc) {
       var type = el.getAttribute('data-customize-type');
       var buttons = JC.getButtons(type);
+      // The double-click action is the first applicable button, unless an applicable button marks
+      // itself { primary: true } (e.g. "Edit content" on a custom module, so a double-click edits the
+      // text rather than opening settings); that wins regardless of order.
       var primary = null;
+      var firstApplicable = null;
 
       for (var i = 0; i < buttons.length; i++) {
-        if (!buttons[i].requires || el.hasAttribute('data-customize-' + buttons[i].requires)) {
+        if (buttons[i].requires && !el.hasAttribute('data-customize-' + buttons[i].requires)) {
+          continue;
+        }
+
+        if (!firstApplicable) {
+          firstApplicable = buttons[i];
+        }
+
+        if (buttons[i].primary) {
           primary = buttons[i];
           break;
         }
       }
+
+      primary = primary || firstApplicable;
 
       if (!primary || typeof primary.onClick !== 'function') {
         return;
@@ -553,14 +620,24 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     }
 
-    // Carry the customize token across in-iframe navigation (same-origin links and forms), so the
-    // mode persists without making it sticky in the session (which would leak into normal browsing).
+    // Carry the customize token (and any active view flags, e.g. "show all positions") across
+    // in-iframe navigation (same-origin links and forms), so the mode persists without making it
+    // sticky in the session (which would leak into normal browsing). The flags are read from the
+    // current preview URL so a toggle stays on as the editor follows links.
     function carryCustomize(doc) {
       var host  = doc.location.host;
       var token = JC.getFrameToken();
 
       if (!token) {
         return;
+      }
+
+      var showPos = false;
+
+      try {
+        showPos = new doc.defaultView.URL(doc.location.href).searchParams.get('customizepositions') === '1';
+      } catch (e) {
+        // non-fatal
       }
 
       Array.prototype.forEach.call(doc.querySelectorAll('a[href]'), function (a) {
@@ -570,23 +647,35 @@ document.addEventListener('DOMContentLoaded', function () {
 
         var href = a.getAttribute('href');
 
-        if (!href || href.charAt(0) === '#' || a.search.indexOf('customize=') !== -1) {
+        if (!href || href.charAt(0) === '#') {
           return;
         }
 
-        a.search = (a.search ? a.search + '&' : '?') + 'customize=' + encodeURIComponent(token);
+        if (a.search.indexOf('customize=') === -1) {
+          a.search = (a.search ? a.search + '&' : '?') + 'customize=' + encodeURIComponent(token);
+        }
+
+        if (showPos && a.search.indexOf('customizepositions=') === -1) {
+          a.search = a.search + '&customizepositions=1';
+        }
       });
 
       Array.prototype.forEach.call(doc.querySelectorAll('form'), function (form) {
-        if (form.querySelector('input[name="customize"]')) {
-          return;
+        if (!form.querySelector('input[name="customize"]')) {
+          var input = doc.createElement('input');
+          input.type = 'hidden';
+          input.name = 'customize';
+          input.value = token;
+          form.appendChild(input);
         }
 
-        var input = doc.createElement('input');
-        input.type = 'hidden';
-        input.name = 'customize';
-        input.value = token;
-        form.appendChild(input);
+        if (showPos && !form.querySelector('input[name="customizepositions"]')) {
+          var posInput = doc.createElement('input');
+          posInput.type = 'hidden';
+          posInput.name = 'customizepositions';
+          posInput.value = '1';
+          form.appendChild(posInput);
+        }
       });
     }
 
@@ -724,7 +813,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (!el.getAttribute('aria-roledescription')) {
-          el.setAttribute('aria-roledescription', JC.text('COM_MENUS_CUSTOMIZE_AREA_ROLEDESCRIPTION', 'Customize area'));
+          el.setAttribute('aria-roledescription', JC.text('COM_TEMPLATES_CUSTOMIZE_AREA_ROLEDESCRIPTION', 'Customize area'));
         }
 
         if (!el.getAttribute('aria-keyshortcuts')) {
@@ -758,14 +847,14 @@ document.addEventListener('DOMContentLoaded', function () {
           return;
         }
 
-        var msg = describe(el) + '. ' + JC.text('COM_MENUS_CUSTOMIZE_AREA_HINT', 'Press Enter to edit');
+        var msg = describe(el) + '. ' + JC.text('COM_TEMPLATES_CUSTOMIZE_AREA_HINT', 'Press Enter to edit');
 
         if (isDraggable(el)) {
-          msg += '. ' + JC.text('COM_MENUS_CUSTOMIZE_AREA_MOVE_HINT', 'Use Ctrl with the arrow keys to move it');
+          msg += '. ' + JC.text('COM_TEMPLATES_CUSTOMIZE_AREA_MOVE_HINT', 'Use Ctrl with the arrow keys to move it');
         }
 
         if (isDeletable(el)) {
-          msg += '. ' + JC.text('COM_MENUS_CUSTOMIZE_AREA_DELETE_HINT', 'Press Delete to remove it');
+          msg += '. ' + JC.text('COM_TEMPLATES_CUSTOMIZE_AREA_DELETE_HINT', 'Press Delete to remove it');
         }
 
         if (srStatus.textContent !== msg) {
@@ -810,7 +899,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (srStatus) {
           var now = peers();
-          var tmpl = JC.text('COM_MENUS_CUSTOMIZE_AREA_MOVED', 'Moved to position %1$s of %2$s');
+          var tmpl = JC.text('COM_TEMPLATES_CUSTOMIZE_AREA_MOVED', 'Moved to position %1$s of %2$s');
           srStatus.textContent = describe(el) + '. ' + tmpl.replace('%1$s', now.indexOf(el) + 1).replace('%2$s', now.length);
         }
       }
