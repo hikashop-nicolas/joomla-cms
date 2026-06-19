@@ -89,6 +89,39 @@ the module plugin does on a module's first tag and the position plugin does on a
 If your render point has no event yet, that is a small core change (fire a `GenericEvent` and use the
 returned string); keep the markup in the plugin, not in core.
 
+### Instrumenting a view you own
+
+When you own the view, the simplest path is to emit the contract straight from your layout, gated on
+`CustomizeMode::isActive()` so visitors get untouched markup. This gives finer control than wrapping a
+whole sub-layout, e.g. to make a list of items drag-reorderable: mark the container as a grid and each
+item as a draggable area.
+
+```php
+<?php // components/com_example/tmpl/items/default.php
+use Joomla\CMS\Customize\CustomizeMode;
+\defined('_JEXEC') or die;
+
+$customize = CustomizeMode::isActive();
+?>
+<div class="example-items"<?php echo $customize ? ' data-customize-grid="example-items"' : ''; ?>>
+<?php foreach ($this->items as $item) : ?>
+    <div class="example-item"<?php echo $customize
+        ? ' data-customize-type="example-item"'
+          . ' data-customize-id="' . (int) $item->id . '"'
+          . ' data-customize-name="' . htmlspecialchars($item->title, ENT_QUOTES) . '"'
+        : ''; ?>>
+        <?php echo $item->body; ?>
+    </div>
+<?php endforeach; ?>
+</div>
+```
+
+In customize mode each `.example-item` is now a selectable area, and because the container is a grid,
+swapping two items is drag-and-drop. You supply the behaviour in your plugin's admin JS (step 3): a
+`registerAreaType('example-item', { draggable: true, onReorder })` whose `onReorder` reads the new
+order from the grid and posts it to your save handler (step 4). The engine handles the drag, drop and
+keyboard reorder; you only persist.
+
 ### The data-customize-* contract
 
 | Attribute | Meaning |
