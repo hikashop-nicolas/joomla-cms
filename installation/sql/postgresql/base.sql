@@ -422,7 +422,8 @@ INSERT INTO "#__extensions" ("package_id", "name", "type", "element", "folder", 
 (0, 'plg_customize_language', 'plugin', 'language', 'customize', 0, 1, 1, 0, 1, '', '', '', 2, 0),
 (0, 'plg_customize_module', 'plugin', 'module', 'customize', 0, 1, 1, 0, 1, '', '', '', 3, 0),
 (0, 'plg_customize_position', 'plugin', 'position', 'customize', 0, 1, 1, 0, 1, '', '', '', 4, 0),
-(0, 'plg_customize_view', 'plugin', 'view', 'customize', 0, 1, 1, 0, 1, '', '', '', 5, 0);
+(0, 'plg_customize_view', 'plugin', 'view', 'customize', 0, 1, 1, 0, 1, '', '', '', 5, 0),
+(0, 'plg_customize_layout', 'plugin', 'layout', 'customize', 0, 1, 1, 0, 1, '', '', '', 6, 0);
 
 -- Templates
 INSERT INTO "#__extensions" ("package_id", "name", "type", "element", "folder", "client_id", "enabled", "access", "protected", "locked", "manifest_cache", "params", "custom_data", "ordering", "state") VALUES
