@@ -164,15 +164,15 @@ $wa->getAsset('style', 'fontawesome')->setAttribute('rel', 'lazy-stylesheet');
 ?>">
     <header class="header container-header full-width<?php echo $stickyHeader ? ' ' . $stickyHeader : ''; ?>">
 
-        <?php if ($this->countModules('topbar')) : ?>
-            <div class="container-topbar">
-                <jdoc:include type="modules" name="topbar" style="none" />
+        <?php if ($this->countModules('topbar') || LayoutHelper::isSplit('topbar')) : ?>
+            <div class="container-topbar"<?php echo LayoutHelper::positionAttrs('topbar'); ?>>
+                <?php echo LayoutHelper::position('topbar', '<jdoc:include type="modules" name="topbar" style="none" />', ['addedStyle' => 'none']); ?>
             </div>
         <?php endif; ?>
 
-        <?php if ($this->countModules('below-top')) : ?>
-            <div class="grid-child container-below-top">
-                <jdoc:include type="modules" name="below-top" style="none" />
+        <?php if ($this->countModules('below-top') || LayoutHelper::isSplit('below-top')) : ?>
+            <div class="grid-child container-below-top"<?php echo LayoutHelper::positionAttrs('below-top'); ?>>
+                <?php echo LayoutHelper::position('below-top', '<jdoc:include type="modules" name="below-top" style="none" />', ['addedStyle' => 'none']); ?>
             </div>
         <?php endif; ?>
 
@@ -189,14 +189,20 @@ $wa->getAsset('style', 'fontawesome')->setAttribute('rel', 'lazy-stylesheet');
             </div>
         <?php endif; ?>
 
-        <?php if ($this->countModules('menu', true) || $this->countModules('search', true)) : ?>
+        <?php if ($this->countModules('menu', true) || $this->countModules('search', true) || LayoutHelper::isSplit('menu') || LayoutHelper::isSplit('search')) : ?>
             <div class="grid-child container-nav">
-                <?php if ($this->countModules('menu', true)) : ?>
-                    <jdoc:include type="modules" name="menu" style="none" />
+                <?php if ($this->countModules('menu', true) || LayoutHelper::isSplit('menu')) : ?>
+                    <?php if ($customizeActive) : ?>
+                        <div class="container-menu"<?php echo LayoutHelper::positionAttrs('menu'); ?>>
+                            <?php echo LayoutHelper::position('menu', '<jdoc:include type="modules" name="menu" style="none" />', ['addedStyle' => 'none']); ?>
+                        </div>
+                    <?php else : ?>
+                        <?php echo LayoutHelper::position('menu', '<jdoc:include type="modules" name="menu" style="none" />', ['addedStyle' => 'none']); ?>
+                    <?php endif; ?>
                 <?php endif; ?>
-                <?php if ($this->countModules('search', true)) : ?>
-                    <div class="container-search">
-                        <jdoc:include type="modules" name="search" style="none" />
+                <?php if ($this->countModules('search', true) || LayoutHelper::isSplit('search')) : ?>
+                    <div class="container-search"<?php echo LayoutHelper::positionAttrs('search'); ?>>
+                        <?php echo LayoutHelper::position('search', '<jdoc:include type="modules" name="search" style="none" />', ['addedStyle' => 'none']); ?>
                     </div>
                 <?php endif; ?>
             </div>
