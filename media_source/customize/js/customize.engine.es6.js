@@ -455,19 +455,29 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     }
 
-    // Position the toolbar at the element's top-left. The element's own outline (a CSS class on it)
+    // Position the toolbar at the element's top edge. The element's own outline (a CSS class on it)
     // tracks size changes by itself, so only the floating toolbar needs placing.
     function positionFor(el, doc) {
       var win = doc.defaultView;
       var rect = el.getBoundingClientRect();
+      var viewport = doc.documentElement.clientWidth || win.innerWidth;
+      var margin = 4;
 
       // The toolbar sits above the element; if the element is too close to the top of the viewport the
       // toolbar would be clipped, so drop it just below the element instead.
       var below = rect.top < (toolbar.offsetHeight || 28) + 2;
       toolbar.classList.toggle('customize-toolbar-below', below);
 
+      // Left-align with the element by default. If that would push the toolbar off the right edge of
+      // the page (an element near the right), pin its right edge to the element's right edge instead,
+      // clamped to the left edge so a toolbar wider than the element still stays on screen.
+      var left = rect.left;
+      if (left + toolbar.offsetWidth > viewport - margin) {
+        left = Math.max(margin, rect.right - toolbar.offsetWidth);
+      }
+
       toolbar.style.top = ((below ? rect.bottom : rect.top) + win.scrollY) + 'px';
-      toolbar.style.left = (rect.left + win.scrollX) + 'px';
+      toolbar.style.left = (left + win.scrollX) + 'px';
     }
 
     function showFor(el, doc) {
