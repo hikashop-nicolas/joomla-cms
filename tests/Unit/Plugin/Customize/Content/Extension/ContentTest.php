@@ -10,10 +10,8 @@
 
 namespace Joomla\Tests\Unit\Plugin\Customize\Content\Extension;
 
-use Joomla\CMS\Application\CMSApplicationInterface;
 use Joomla\CMS\Customize\CustomizeMode;
 use Joomla\CMS\Event\Content\ContentPrepareEvent;
-use Joomla\Input\Input;
 use Joomla\Plugin\Customize\Content\Extension\Content;
 use Joomla\Registry\Registry;
 use Joomla\Tests\Unit\UnitTestCase;
@@ -45,7 +43,7 @@ class ContentTest extends UnitTestCase
     }
 
     /**
-     * Put CustomizeMode into the active state.
+     * Put CustomizeMode into the active state (activation itself is covered by CustomizeModeTest).
      *
      * @return  void
      *
@@ -53,10 +51,7 @@ class ContentTest extends UnitTestCase
      */
     private function activate(): void
     {
-        $app = $this->createMock(CMSApplicationInterface::class);
-        $app->method('getInput')->willReturn(new Input(['customize' => '1']));
-
-        CustomizeMode::detect($app);
+        (new \ReflectionClass(CustomizeMode::class))->getProperty('active')->setValue(null, true);
     }
 
     /**

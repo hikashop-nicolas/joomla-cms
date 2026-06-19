@@ -164,6 +164,7 @@ class ViewTest extends UnitTestCase
     public function testOverrideRequestBuildsExpectedPaths()
     {
         $parts = $this->sanitize([
+            'type'      => 'view',
             'component' => 'com_content',
             'view'      => 'featured',
             'template'  => 'cassiopeia',
@@ -174,6 +175,7 @@ class ViewTest extends UnitTestCase
         $this->assertSame('default_item.php', $parts['fileName']);
         $this->assertSame('/html/com_content/featured/default_item.php', $parts['relPath']);
         $this->assertSame('cassiopeia', $parts['template']);
+        $this->assertSame('view', $parts['type']);
     }
 
     /**
@@ -185,7 +187,7 @@ class ViewTest extends UnitTestCase
      */
     public function testOverrideRequestRejectsUnsafeSource()
     {
-        $base = ['component' => 'com_content', 'view' => 'featured'];
+        $base = ['type' => 'view', 'component' => 'com_content', 'view' => 'featured'];
 
         // Path traversal.
         $this->assertNull($this->sanitize($base + ['source' => 'components/com_content/../../configuration.php']));
@@ -206,8 +208,10 @@ class ViewTest extends UnitTestCase
      */
     public function testOverrideRequestRejectsMissingSegments()
     {
-        $this->assertNull($this->sanitize(['component' => '', 'view' => 'featured', 'source' => self::SOURCE]));
-        $this->assertNull($this->sanitize(['component' => 'com_content', 'view' => '', 'source' => self::SOURCE]));
-        $this->assertNull($this->sanitize(['component' => 'com_content', 'view' => 'featured', 'source' => '']));
+        $this->assertNull($this->sanitize(['type' => 'view', 'component' => '', 'view' => 'featured', 'source' => self::SOURCE]));
+        $this->assertNull($this->sanitize(['type' => 'view', 'component' => 'com_content', 'view' => '', 'source' => self::SOURCE]));
+        $this->assertNull($this->sanitize(['type' => 'view', 'component' => 'com_content', 'view' => 'featured', 'source' => '']));
+        // A missing/invalid type is itself rejected.
+        $this->assertNull($this->sanitize(['component' => 'com_content', 'view' => 'featured', 'source' => self::SOURCE]));
     }
 }

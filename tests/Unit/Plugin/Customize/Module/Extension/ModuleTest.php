@@ -10,6 +10,7 @@
 
 namespace Joomla\Tests\Unit\Plugin\Customize\Module\Extension;
 
+use Joomla\CMS\Application\CMSApplication;
 use Joomla\CMS\Event\GenericEvent;
 use Joomla\Plugin\Customize\Module\Extension\Module;
 use Joomla\Tests\Unit\UnitTestCase;
@@ -35,7 +36,18 @@ class ModuleTest extends UnitTestCase
      */
     private function plugin(): Module
     {
-        return new Module(['params' => []]);
+        // The plugin resolves the active template to build the "Edit layout" override path; the concrete
+        // site app is final, so mock the abstract base for getTemplate().
+        $app = $this->getMockBuilder(CMSApplication::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getTemplate'])
+            ->getMockForAbstractClass();
+        $app->method('getTemplate')->willReturn('cassiopeia');
+
+        $plugin = new Module(['params' => []]);
+        $plugin->setApplication($app);
+
+        return $plugin;
     }
 
     /**

@@ -1,59 +1,86 @@
-describe('Test that the com_menus Customize host', () => {
+describe('Test that the com_templates Customize host', () => {
   beforeEach(() => cy.doAdministratorLogin());
 
-  it('opens for a menu item and loads the ES module engine and plugins', () => {
-    cy.task('queryDB', "SELECT id FROM #__menu WHERE home = 1 AND client_id = 0 AND published = 1 LIMIT 1")
-      .then((rows) => {
-        const id = rows[0].id;
+  // The default home site template style (Customize is launched per style from Templates: Styles).
+  const styleQuery = "SELECT id FROM #__template_styles WHERE client_id = 0 AND home = '1' LIMIT 1";
 
-        cy.visit(`administrator/index.php?option=com_menus&view=customize&id=${id}`);
+  it('opens for a template style and loads the engine + layout plugin', () => {
+    cy.task('queryDB', styleQuery).then((rows) => {
+      cy.visit(`administrator/index.php?option=com_templates&view=customize&id=${rows[0].id}`);
 
-        // The host view renders, with the toolbar title and the live-preview iframe.
-        cy.get('h1.page-title').should('contain.text', 'Customize');
-        cy.get('#customize-frame').should('exist');
+      // The host view renders, with the toolbar title and the live-preview iframe.
+      cy.get('h1.page-title').should('contain.text', 'Customize');
+      cy.get('#customize-frame').should('exist');
 
-        // The engine module loads and exposes the API on the parent window.
-        cy.window().its('JoomlaCustomize').should('exist');
-        cy.window().its('JoomlaCustomize.registerAreaType').should('be.a', 'function');
+      // The engine module loads and exposes the API on the parent window.
+      cy.window().its('JoomlaCustomize').should('exist');
 
-        // The customize plugins are ES modules that import the shared api; the module plugin
-        // registering its buttons proves that wiring resolved at runtime.
-        cy.window().its('JoomlaCustomize').invoke('getButtons', 'module')
-          .should('have.length.greaterThan', 0);
+      // The layout plugin registered its toolbar buttons (Move + Split on a layout block) ...
+      cy.window().its('JoomlaCustomize').invoke('getButtons', 'layout-block').then((buttons) => {
+        const ids = buttons.map((button) => button.id);
+        expect(ids).to.include('move');
+        expect(ids).to.include('split');
       });
+
+      // ... and its split-cell area type (draggable, so cells reorder among themselves).
+      cy.window().its('JoomlaCustomize').invoke('getAreaType', 'split-cell')
+        .its('draggable').should('eq', true);
+    });
   });
 
-  it('persists an inline content edit made through the engine API', () => {
-    const marker = 'Edited by the Customize system test';
-    let articleId;
-
-    // A content area edit, end to end: the engine calls the content plugin's save action over
-    // com_ajax, which saves through the article model. (The article is removed by cleanupDB.)
-    cy.db_createArticle({ title: 'Customize system test article', introtext: '<p>Original intro</p>' })
-      .then((article) => {
-        articleId = article.id;
-      });
-
-    cy.task('queryDB', "SELECT id FROM #__menu WHERE home = 1 AND client_id = 0 AND published = 1 LIMIT 1")
-      .then((rows) => {
-        cy.visit(`administrator/index.php?option=com_menus&view=customize&id=${rows[0].id}`);
-      });
+  it('reads the template positions through the templateAction endpoint', () => {
+    cy.task('queryDB', styleQuery).then((rows) => {
+      cy.visit(`administrator/index.php?option=com_templates&view=customize&id=${rows[0].id}`);
+    });
 
     cy.window().its('JoomlaCustomize').should('exist');
 
     cy.window()
-      .then((win) => win.JoomlaCustomize.callAction('content', 'save', {
-        id: articleId,
-        field: 'introtext',
-        html: `<p>${marker}</p>`,
-      }))
+      .then((win) => win.JoomlaCustomize.templateAction('listPositions', {}))
+      .then((res) => {
+        expect(res).to.have.property('success', true);
+        expect(res).to.have.property('grids');
+      });
+  });
+
+  it('splits a position (distributing its modules), then unsplits to restore them', () => {
+    cy.task('queryDB', styleQuery).then((rows) => {
+      cy.visit(`administrator/index.php?option=com_templates&view=customize&id=${rows[0].id}`);
+    });
+
+    cy.window().its('JoomlaCustomize').should('exist');
+
+    // Two modules in top-a so a two-column split puts one in each cell.
+    cy.window().then((win) => win.JoomlaCustomize.callAction('position', 'add', { title: 'CyTest A', module: 'mod_custom', position: 'top-a' }))
+      .then((res) => expect(res).to.have.property('success', true));
+    cy.window().then((win) => win.JoomlaCustomize.callAction('position', 'add', { title: 'CyTest B', module: 'mod_custom', position: 'top-a' }))
+      .then((res) => expect(res).to.have.property('success', true));
+
+    // Split top-a -> [top-a, top-a-2]; the two modules end up one per cell.
+    cy.window().then((win) => win.JoomlaCustomize.templateAction('splitPosition', { block: 'top-a', layout: 'cols-2' }))
+      .then((res) => {
+        expect(res).to.have.property('success', true);
+        expect(res.positions).to.deep.equal(['top-a', 'top-a-2']);
+
+        return cy.task('queryDB', "SELECT position FROM #__modules WHERE title IN ('CyTest A', 'CyTest B') AND client_id = 0 ORDER BY ordering");
+      })
+      .then((rows) => {
+        expect(rows.map((row) => row.position).sort()).to.deep.equal(['top-a', 'top-a-2']);
+      });
+
+    // Unsplit folds both modules back into top-a and drops the split.
+    cy.window().then((win) => win.JoomlaCustomize.templateAction('unsplitPosition', { block: 'top-a' }))
       .then((res) => {
         expect(res).to.have.property('success', true);
 
-        return cy.task('queryDB', `SELECT introtext FROM #__content WHERE id = ${articleId}`);
+        return cy.task('queryDB', "SELECT position FROM #__modules WHERE title IN ('CyTest A', 'CyTest B') AND client_id = 0");
       })
       .then((rows) => {
-        expect(rows[0].introtext).to.contain(marker);
+        rows.forEach((row) => expect(row.position).to.equal('top-a'));
       });
+
+    // Remove the test modules.
+    cy.task('queryDB', "DELETE mm FROM #__modules_menu mm JOIN #__modules m ON m.id = mm.moduleid WHERE m.title IN ('CyTest A', 'CyTest B')");
+    cy.task('queryDB', "DELETE FROM #__modules WHERE title IN ('CyTest A', 'CyTest B')");
   });
 });

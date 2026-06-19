@@ -12,6 +12,7 @@ namespace Joomla\Tests\Unit\Libraries\Cms\Customize;
 
 use Joomla\CMS\Application\CMSApplicationInterface;
 use Joomla\CMS\Customize\CustomizeMode;
+use Joomla\CMS\Factory;
 use Joomla\Input\Input;
 use Joomla\Tests\Unit\UnitTestCase;
 
@@ -25,6 +26,14 @@ use Joomla\Tests\Unit\UnitTestCase;
 class CustomizeModeTest extends UnitTestCase
 {
     /**
+     * The Factory application present before a test, restored afterwards.
+     *
+     * @var    CMSApplicationInterface|null
+     * @since  __DEPLOY_VERSION__
+     */
+    private $originalApp = null;
+
+    /**
      * Reset the class's static state before each test.
      *
      * @return  void
@@ -35,11 +44,27 @@ class CustomizeModeTest extends UnitTestCase
     {
         parent::setUp();
 
+        $this->originalApp = Factory::$application;
+
         $reflection = new \ReflectionClass(CustomizeMode::class);
 
-        foreach (['active' => false, 'strings' => [], 'sprintf' => []] as $property => $value) {
+        foreach (['active' => false, 'showAllPositions' => false, 'strings' => [], 'sprintf' => []] as $property => $value) {
             $reflection->getProperty($property)->setValue(null, $value);
         }
+    }
+
+    /**
+     * Restore the Factory application after each test (tests that validate a token set it).
+     *
+     * @return  void
+     *
+     * @since   __DEPLOY_VERSION__
+     */
+    protected function tearDown(): void
+    {
+        Factory::$application = $this->originalApp;
+
+        parent::tearDown();
     }
 
     /**
@@ -72,15 +97,67 @@ class CustomizeModeTest extends UnitTestCase
     }
 
     /**
+     * Build a Factory application whose site secret signs/validates customize tokens.
+     *
+     * @return  CMSApplicationInterface
+     *
+     * @since   __DEPLOY_VERSION__
+     */
+    private function signerApp(): CMSApplicationInterface
+    {
+        $app = $this->createMock(CMSApplicationInterface::class);
+        $app->method('get')->willReturnCallback(
+            static fn ($key, $default = null) => $key === 'secret' ? 'unit-test-secret' : $default
+        );
+
+        return $app;
+    }
+
+    /**
      * @return  void
      *
      * @since   __DEPLOY_VERSION__
      */
-    public function testDetectActivatesWhenTheFlagIsSet()
+    public function testDetectActivatesWithAValidToken()
     {
-        CustomizeMode::detect($this->applicationWithCustomize('1'));
+        // mintToken + validateToken both sign with the Factory application's secret.
+        Factory::$application = $this->signerApp();
+        $token                = CustomizeMode::mintToken(42);
+
+        CustomizeMode::detect($this->applicationWithCustomize($token));
 
         $this->assertTrue(CustomizeMode::isActive());
+    }
+
+    /**
+     * @return  void
+     *
+     * @since   __DEPLOY_VERSION__
+     */
+    public function testDetectRejectsAnExpiredToken()
+    {
+        Factory::$application = $this->signerApp();
+        $token                = CustomizeMode::mintToken(42, -10);
+
+        CustomizeMode::detect($this->applicationWithCustomize($token));
+
+        $this->assertFalse(CustomizeMode::isActive());
+    }
+
+    /**
+     * @return  void
+     *
+     * @since   __DEPLOY_VERSION__
+     */
+    public function testDetectRejectsATamperedToken()
+    {
+        Factory::$application = $this->signerApp();
+        $token                = CustomizeMode::mintToken(42);
+        $tampered             = substr($token, 0, -1) . (substr($token, -1) === 'a' ? 'b' : 'a');
+
+        CustomizeMode::detect($this->applicationWithCustomize($tampered));
+
+        $this->assertFalse(CustomizeMode::isActive());
     }
 
     /**
