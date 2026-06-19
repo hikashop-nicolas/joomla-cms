@@ -40,40 +40,52 @@ Build the JS with the standard pipeline (`npm run build` / `node build/build-cus
 
 ## 1. Instrument the front-end (PHP)
 
-Emit your markup only when the mode is active, so normal visitors get untouched output:
+Most extensions render their output through `HtmlView`, so the event you are most likely to hook is
+`onCustomizeRenderView`. Core fires it for every view sub-layout, of **any** component (it resolves the
+layout through the view's own registered template paths, so it works for the `tmpl/<view>/` convention
+*and* for layouts under `views/<view>/tmpl/`), and uses the string you return. Subscribe to the event
+your content flows through (your plugin's `getSubscribedEvents()` maps it to a handler):
+
+| Event | Fired by | Carries |
+|---|---|---|
+| `onCustomizeRenderView` | `HtmlView::loadTemplate`, per view sub-layout, any component | `output`, `block`, `component`, `view`, `layout`, `file` |
+| `onCustomizeModule` | `ModulesRenderer` | `module`, `position`, `output` |
+| `onCustomizeEmptyPosition` | `ModulesRenderer` | `position` (subject), `content` |
+| `onContentPrepare` | content rendering (fires always) | the item |
+| (string collector) | `Text::_` / `Text::sprintf` via `CustomizeMode::recordString()` | key + text |
+
+The dedicated customize events (the first three) fire **only in customize mode**, so their handlers
+need no guard. A general event you reuse, like `onContentPrepare`, fires always, so guard it with
+`if (!CustomizeMode::isActive()) { return; }`.
+
+Your handler mutates the event's output string to inject the contract. The shipped `view` plugin
+already handles `onCustomizeRenderView` for **every** component's views, so any view layout is
+overridable in customize mode with no work from you; subscribe to it from your own plugin only to add
+component-specific affordances, and gate on your component:
 
 ```php
-use Joomla\CMS\Customize\CustomizeMode;
-
-if (!CustomizeMode::isActive()) {
-    return;
-}
-```
-
-Core fires these generic events at its render points; subscribe to the one your content flows through
-(your plugin's PHP `getSubscribedEvents()` maps them to handlers):
-
-| Event | Fired by | Carries | Used by |
-|---|---|---|---|
-| `onContentPrepare` | content rendering | the item | content |
-| `onCustomizeModule` | `ModulesRenderer` | module, position, `output` | module |
-| `onCustomizeEmptyPosition` | `ModulesRenderer` | position, `content` | position |
-| `onCustomizeRenderView` | `HtmlView::loadTemplate` | component/view/layout/file, `output` | view |
-| (string collector) | `Text::_` / `Text::sprintf` via `CustomizeMode::recordString()` | key + text | language |
-
-Your handler mutates the event's output string to inject the contract. Example (the position plugin's
-empty-position drop zone):
-
-```php
-public function onCustomizeEmptyPosition(GenericEvent $event): void
+public function onCustomizeRenderView(GenericEvent $event): void
 {
-    $position = (string) $event->getArgument('subject', '');
-    $event->setArgument('content',
-        '<div class="customize-empty-position" data-customize-dropzone="module" data-customize-droppos="'
-        . htmlspecialchars($position, ENT_QUOTES) . '">' . htmlspecialchars($position) . '</div>');
+    if ($event->getArgument('component') !== 'com_example') {
+        return; // only our own views
+    }
+
+    $output = (string) $event->getArgument('output', '');
+    $block  = (string) $event->getArgument('block', '');
+
+    if ($output === '' || $block === '') {
+        return;
+    }
+
+    // Comment markers carry the block's identity; your admin JS turns the pair into an editable area.
+    // (A sub-layout's output is not always a single element, so markers are safer than a wrapper div.)
+    $meta = 'component=com_example;view=' . $event->getArgument('view') . ';block=' . $block;
+    $event->setArgument('output', '<!--customize-block-start:' . $meta . '-->' . $output . '<!--customize-block-end-->');
 }
 ```
 
+When the markup *is* a single element you can inject `data-customize-*` attributes directly instead, as
+the module plugin does on a module's first tag and the position plugin does on an empty-position slot.
 If your render point has no event yet, that is a small core change (fire a `GenericEvent` and use the
 returned string); keep the markup in the plugin, not in core.
 
