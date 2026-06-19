@@ -19,6 +19,8 @@ for layout, a per-style child template).
   third-party extension) makes its own front-end output editable.
 - [CUSTOMIZE_TEMPLATES.md](CUSTOMIZE_TEMPLATES.md) - make a site template support layout editing
   (move / add / remove / split / resize module positions) through the core layout helper.
+- [CUSTOMIZE_CHANGES.md](CUSTOMIZE_CHANGES.md) - for Joomla maintainers: what this branch adds and
+  changes, by area (core, com_templates, the engine, each plugin, Cassiopeia, install, tests).
 
 ## Try it
 
