@@ -10,6 +10,7 @@
 
 namespace Joomla\Plugin\Customize\Position\Extension;
 
+use Joomla\CMS\Customize\CustomizeMode;
 use Joomla\CMS\Event\GenericEvent;
 use Joomla\CMS\Event\Plugin\AjaxEvent;
 use Joomla\CMS\Factory;
@@ -30,7 +31,7 @@ use Joomla\Event\SubscriberInterface;
  * Customize plugin: rearrange modules. Reorder within/between positions by drag and drop, and move
  * a module to any template position (including empty ones) via a picker.
  *
- * @since  1.0.0
+ * @since  __DEPLOY_VERSION__
  */
 final class Position extends CMSPlugin implements SubscriberInterface
 {
@@ -38,7 +39,7 @@ final class Position extends CMSPlugin implements SubscriberInterface
      * Load the plugin language file on instantiation.
      *
      * @var    boolean
-     * @since  1.0.0
+     * @since  __DEPLOY_VERSION__
      */
     protected $autoloadLanguage = true;
 
@@ -47,7 +48,7 @@ final class Position extends CMSPlugin implements SubscriberInterface
      *
      * @return  array
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     public static function getSubscribedEvents(): array
     {
@@ -66,15 +67,19 @@ final class Position extends CMSPlugin implements SubscriberInterface
      *
      * @return  void
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     public function onCustomizeEmptyPosition(GenericEvent $event): void
     {
         $position = (string) $event->getArgument('subject', '');
 
+        // In "show all positions" mode the marker is shown at all times (a labeled drop slot), not just
+        // while a module is being dragged, so the editor can see the full position map.
+        $shown = CustomizeMode::showAllPositions() ? ' customize-empty-position-shown' : '';
+
         $event->setArgument(
             'content',
-            '<div class="customize-empty-position" data-customize-dropzone="module" data-customize-droppos="'
+            '<div class="customize-empty-position' . $shown . '" data-customize-dropzone="module" data-customize-droppos="'
             . htmlspecialchars($position, ENT_QUOTES) . '">'
             . htmlspecialchars($position) . '</div>'
         );
@@ -87,12 +92,14 @@ final class Position extends CMSPlugin implements SubscriberInterface
      *
      * @return  void
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     public function onAjaxPosition(AjaxEvent $event): void
     {
         if (!Session::checkToken('post')) {
-            $event->addResult($this->fail(Text::_('JINVALID_TOKEN')));
+            // Flag the auth failure so the customize host can tell the editor their session expired,
+            // rather than the drag/drop just failing silently.
+            $event->addResult(json_encode(['success' => false, 'authExpired' => true, 'message' => Text::_('JINVALID_TOKEN')]));
 
             return;
         }
@@ -124,6 +131,10 @@ final class Position extends CMSPlugin implements SubscriberInterface
                 $event->addResult($this->doDelete($payload));
                 break;
 
+            case 'swap':
+                $event->addResult($this->doSwap($payload));
+                break;
+
             default:
                 $event->addResult($this->fail(Text::_('PLG_CUSTOMIZE_POSITION_ERROR_INVALID')));
         }
@@ -136,7 +147,7 @@ final class Position extends CMSPlugin implements SubscriberInterface
      *
      * @return  string  JSON result.
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private function doReorder(array $payload): string
     {
@@ -180,7 +191,7 @@ final class Position extends CMSPlugin implements SubscriberInterface
      *
      * @return  string  JSON result.
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private function doMove(array $payload): string
     {
@@ -221,7 +232,7 @@ final class Position extends CMSPlugin implements SubscriberInterface
      *
      * @return  string  JSON result.
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private function doDelete(array $payload): string
     {
@@ -247,11 +258,44 @@ final class Position extends CMSPlugin implements SubscriberInterface
     }
 
     /**
+     * Swap the modules of two positions (e.g. the left and right sidebars). A content-level move only,
+     * it does not touch the template's grid, so it cannot conflict with the width-ratio CSS.
+     *
+     * @param   array  $payload  { a, b } the two position names.
+     *
+     * @return  string  JSON result.
+     *
+     * @since   __DEPLOY_VERSION__
+     */
+    private function doSwap(array $payload): string
+    {
+        $a = trim((string) ($payload['a'] ?? ''));
+        $b = trim((string) ($payload['b'] ?? ''));
+
+        if ($a === '' || $b === '' || $a === $b || !$this->getApplication()->getIdentity()->authorise('core.edit', 'com_modules')) {
+            return $this->fail(Text::_('PLG_CUSTOMIZE_POSITION_ERROR_INVALID'));
+        }
+
+        $db   = Factory::getContainer()->get(DatabaseInterface::class);
+        $case = 'CASE WHEN ' . $db->quoteName('position') . ' = ' . $db->quote($a) . ' THEN ' . $db->quote($b)
+            . ' ELSE ' . $db->quote($a) . ' END';
+
+        $query = $db->createQuery()
+            ->update($db->quoteName('#__modules'))
+            ->set($db->quoteName('position') . ' = ' . $case)
+            ->where($db->quoteName('position') . ' IN (' . $db->quote($a) . ', ' . $db->quote($b) . ')')
+            ->where($db->quoteName('client_id') . ' = 0');
+        $db->setQuery($query)->execute();
+
+        return json_encode(['success' => true]);
+    }
+
+    /**
      * Return the installed, enabled site module types (for the "Add module" picker).
      *
      * @return  string  JSON result.
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private function doModuleTypes(): string
     {
@@ -295,7 +339,7 @@ final class Position extends CMSPlugin implements SubscriberInterface
      *
      * @return  string  JSON result.
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private function doAdd(array $payload): string
     {
@@ -371,7 +415,7 @@ final class Position extends CMSPlugin implements SubscriberInterface
      *
      * @return  string  JSON result.
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private function doPositions(): string
     {
@@ -387,7 +431,7 @@ final class Position extends CMSPlugin implements SubscriberInterface
      *
      * @return  string[]
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private function templatePositions(): array
     {
@@ -413,7 +457,7 @@ final class Position extends CMSPlugin implements SubscriberInterface
      *
      * @return  void
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     public function onCustomizeAdminInit(): void
     {
@@ -433,12 +477,13 @@ final class Position extends CMSPlugin implements SubscriberInterface
 
         foreach (
             [
-                'PLG_CUSTOMIZE_POSITION_ADDED',
                 'PLG_CUSTOMIZE_POSITION_ADD_BAR',
                 'PLG_CUSTOMIZE_POSITION_ADD_BTN',
                 'PLG_CUSTOMIZE_POSITION_ADD_FAILED',
                 'PLG_CUSTOMIZE_POSITION_ADD_HINT',
                 'PLG_CUSTOMIZE_POSITION_ADD_NEEDINFO',
+                'PLG_CUSTOMIZE_POSITION_ADD_NEEDPOS',
+                'PLG_CUSTOMIZE_POSITION_ADD_SUBMIT',
                 'PLG_CUSTOMIZE_POSITION_ADD_TITLE',
                 'PLG_CUSTOMIZE_POSITION_ADD_TYPE',
                 'PLG_CUSTOMIZE_POSITION_BTN_MOVE',
@@ -446,13 +491,16 @@ final class Position extends CMSPlugin implements SubscriberInterface
                 'PLG_CUSTOMIZE_POSITION_DROP_HINT',
                 'PLG_CUSTOMIZE_POSITION_LABEL',
                 'PLG_CUSTOMIZE_POSITION_LOAD_FAILED',
-                'PLG_CUSTOMIZE_POSITION_MOVED',
+                'PLG_CUSTOMIZE_POSITION_NEW_NAME',
+                'PLG_CUSTOMIZE_POSITION_NEW_OPTION',
                 'PLG_CUSTOMIZE_POSITION_ORDER',
                 'PLG_CUSTOMIZE_POSITION_ORDER_AFTER',
                 'PLG_CUSTOMIZE_POSITION_ORDER_TOP',
                 'PLG_CUSTOMIZE_POSITION_SAVED',
                 'PLG_CUSTOMIZE_POSITION_SAVE_ERROR',
                 'PLG_CUSTOMIZE_POSITION_SAVE_FAILED',
+                'PLG_CUSTOMIZE_POSITION_SHOW_ALL',
+                'PLG_CUSTOMIZE_POSITION_SHOW_USED',
                 'PLG_CUSTOMIZE_POSITION_UNKNOWN_ERROR',
             ] as $key
         ) {
@@ -467,7 +515,7 @@ final class Position extends CMSPlugin implements SubscriberInterface
      *
      * @return  string
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private function fail(string $message): string
     {
@@ -480,7 +528,7 @@ final class Position extends CMSPlugin implements SubscriberInterface
      *
      * @return  boolean
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private function canManageModules(): bool
     {

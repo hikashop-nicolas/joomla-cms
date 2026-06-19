@@ -33,7 +33,7 @@ use Joomla\Registry\Registry;
  * Frontend: wraps each article body with data-customize-* markup when customize mode is active.
  * Admin: handles the save / load / saveprops AJAX actions through com_ajax (group=customize).
  *
- * @since  1.0.0
+ * @since  __DEPLOY_VERSION__
  */
 final class Content extends CMSPlugin implements SubscriberInterface
 {
@@ -41,7 +41,7 @@ final class Content extends CMSPlugin implements SubscriberInterface
      * Load the plugin language file on instantiation.
      *
      * @var    boolean
-     * @since  1.0.0
+     * @since  __DEPLOY_VERSION__
      */
     protected $autoloadLanguage = true;
 
@@ -49,7 +49,7 @@ final class Content extends CMSPlugin implements SubscriberInterface
      * Article fields that may be saved inline.
      *
      * @var    string[]
-     * @since  1.0.0
+     * @since  __DEPLOY_VERSION__
      */
     private const EDITABLE_FIELDS = ['introtext', 'fulltext', 'title'];
 
@@ -58,7 +58,7 @@ final class Content extends CMSPlugin implements SubscriberInterface
      *
      * @return  array
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     public static function getSubscribedEvents(): array
     {
@@ -75,7 +75,7 @@ final class Content extends CMSPlugin implements SubscriberInterface
      *
      * @return  void
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     public function onCustomizeAdminInit(): void
     {
@@ -138,7 +138,7 @@ final class Content extends CMSPlugin implements SubscriberInterface
      *
      * @return  void
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     public function onContentPrepare(ContentPrepareEvent $event): void
     {
@@ -189,7 +189,7 @@ final class Content extends CMSPlugin implements SubscriberInterface
      *
      * @return  void
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     public function onAjaxContent(AjaxEvent $event): void
     {
@@ -255,7 +255,7 @@ final class Content extends CMSPlugin implements SubscriberInterface
      *
      * @return  string  JSON result.
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private function doSave($model, $record, array $payload): string
     {
@@ -291,7 +291,7 @@ final class Content extends CMSPlugin implements SubscriberInterface
      *
      * @return  string  JSON result.
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private function doLoad($record): string
     {
@@ -315,7 +315,7 @@ final class Content extends CMSPlugin implements SubscriberInterface
      *
      * @return  string  JSON result.
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private function doSaveProps($model, $record, array $payload): string
     {
@@ -342,7 +342,7 @@ final class Content extends CMSPlugin implements SubscriberInterface
      *
      * @return  string  JSON result.
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private function doSaveImage($model, $record, array $payload): string
     {
@@ -368,7 +368,7 @@ final class Content extends CMSPlugin implements SubscriberInterface
      *
      * @return  string  JSON result.
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private function doNewCategory($model, $record, array $payload): string
     {
@@ -425,7 +425,7 @@ final class Content extends CMSPlugin implements SubscriberInterface
      *
      * @return  array
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private function categories(): array
     {
@@ -458,7 +458,7 @@ final class Content extends CMSPlugin implements SubscriberInterface
      *
      * @return  boolean
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private function canEdit(object $record): bool
     {
@@ -477,7 +477,7 @@ final class Content extends CMSPlugin implements SubscriberInterface
      *
      * @return  \Joomla\CMS\MVC\Model\AdminModel
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private function articleModel()
     {
@@ -492,7 +492,7 @@ final class Content extends CMSPlugin implements SubscriberInterface
      *
      * @return  string
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private function fail(string $message): string
     {

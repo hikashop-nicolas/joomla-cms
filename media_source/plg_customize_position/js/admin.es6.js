@@ -17,6 +17,12 @@ import JC from 'customize.api';
   }
 
   function reloadFrame() {
+    // Don't reload once the session has expired: it can't recover and would drop the overlay; the
+    // host shows a re-login notice instead.
+    if (JC.sessionExpired) {
+      return;
+    }
+
     var f = window.document.getElementById('customize-frame');
 
     if (f) {
@@ -34,14 +40,21 @@ import JC from 'customize.api';
 
   // --- In-place reorder (drop onto a module / empty-position zone) -------------
 
-  function saveOrder(doc, position) {
+  // reloadAfter: reload the preview on success instead of a toast. Used after a cross-position move,
+  // where the set of empty positions changed: the emptied position needs its drop marker back and the
+  // filled one needs its marker gone, and those are server-rendered, so only a reload gets them right.
+  function saveOrder(doc, position, reloadAfter) {
     var ids = Array.prototype.map.call(doc.querySelectorAll(moduleSelector(position)), function (m) {
       return m.getAttribute('data-customize-id');
     });
 
     JC.callAction('position', 'reorder', { position: position, order: ids }).then(function (res) {
       if (res && res.success) {
-        JC.ui.toast(doc, t('PLG_CUSTOMIZE_POSITION_SAVED', 'Order saved.'));
+        if (reloadAfter) {
+          reloadFrame();
+        } else {
+          JC.ui.toast(doc, t('PLG_CUSTOMIZE_POSITION_SAVED', 'Order saved.'));
+        }
       } else {
         var reason = (res && res.message) || t('PLG_CUSTOMIZE_POSITION_UNKNOWN_ERROR', 'unknown error');
         JC.ui.toast(doc, t('PLG_CUSTOMIZE_POSITION_SAVE_FAILED', 'Save failed: %s').replace('%s', reason));
@@ -209,7 +222,7 @@ import JC from 'customize.api';
             if (r && r.success) {
               // Keep the keyboard user on the module once the frame re-renders in its new spot.
               if (JC.selectAfterReload) {
-                JC.selectAfterReload(pending, t('COM_MENUS_CUSTOMIZE_AREA_MOVED_TO', 'Moved to %s').replace('%s', pos));
+                JC.selectAfterReload(pending, t('COM_TEMPLATES_CUSTOMIZE_AREA_MOVED_TO', 'Moved to %s').replace('%s', pos));
               }
 
               pending = null;   // the frame reloads, so there is nothing to un-grey or refocus
@@ -300,8 +313,8 @@ import JC from 'customize.api';
   });
 
   // --- Add module (panel control, in the admin parent) ------------------------
-  // Pick a type + title; the module is created in a default position and shown highlighted and
-  // draggable, so the position is chosen by dragging it (like any other module).
+  // Pick a type + title, then either choose a position and click Add (keyboard friendly, and can
+  // target a position not visible on the current page), or drag the bar onto the page to place it.
 
   var newModuleId = null;
 
@@ -310,11 +323,6 @@ import JC from 'customize.api';
 
     var form = doc.createElement('div');
     form.className = 'customize-add-form';
-
-    // Draggable bar at the top: grab it and drop it on the page to place (and create) the module.
-    var bar = doc.createElement('div');
-    bar.className = 'customize-add-bar';
-    bar.setAttribute('draggable', 'true');
 
     var typeLabel = doc.createElement('label');
     typeLabel.textContent = t('PLG_CUSTOMIZE_POSITION_ADD_TYPE', 'Module type');
@@ -327,26 +335,57 @@ import JC from 'customize.api';
     titleInput.type = 'text';
     titleInput.className = 'form-control form-control-sm';
 
-    var hint = doc.createElement('div');
-    hint.className = 'customize-add-hint';
-    hint.textContent = t('PLG_CUSTOMIZE_POSITION_ADD_HINT', 'Set a type and title, then drag the bar onto the page.');
+    var posLabel = doc.createElement('label');
+    posLabel.textContent = t('PLG_CUSTOMIZE_POSITION_LABEL', 'Position');
+    var posSel = doc.createElement('select');
+    posSel.className = 'form-select form-select-sm';
 
-    var msg = doc.createElement('div');
-    msg.className = 'customize-status is-warn customize-hidden';
+    // Shown when the "+ New position" option is chosen: the name of a position to create with the
+    // module (so the position and a module to fill it are created together, and the result is visible).
+    var posNew = doc.createElement('input');
+    posNew.type = 'text';
+    posNew.className = 'form-control form-control-sm customize-hidden';
+    posNew.placeholder = t('PLG_CUSTOMIZE_POSITION_NEW_NAME', 'New position name');
+
+    var actions = doc.createElement('div');
+    actions.className = 'customize-add-actions';
+
+    var addBtn = doc.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'btn btn-primary btn-sm';
+    addBtn.textContent = t('PLG_CUSTOMIZE_POSITION_ADD_SUBMIT', 'Add');
 
     var cancel = doc.createElement('button');
     cancel.type = 'button';
     cancel.className = 'btn btn-secondary btn-sm';
-    cancel.textContent = t('COM_MENUS_CUSTOMIZE_CANCEL', 'Cancel');
+    cancel.textContent = t('COM_TEMPLATES_CUSTOMIZE_CANCEL', 'Cancel');
 
-    form.appendChild(bar);
+    var hint = doc.createElement('div');
+    hint.className = 'customize-add-hint';
+    hint.textContent = t('PLG_CUSTOMIZE_POSITION_ADD_HINT', 'Choose a position and click Add, or drag the bar onto the page.');
+
+    var msg = doc.createElement('div');
+    msg.className = 'customize-status is-warn customize-hidden';
+
+    // Draggable bar: an alternative to picking a position, drop it on the page to place the module.
+    var bar = doc.createElement('div');
+    bar.className = 'customize-add-bar';
+    bar.setAttribute('draggable', 'true');
+
+    actions.appendChild(addBtn);
+    actions.appendChild(cancel);
+
     form.appendChild(typeLabel);
     form.appendChild(typeSel);
     form.appendChild(titleLabel);
     form.appendChild(titleInput);
+    form.appendChild(posLabel);
+    form.appendChild(posSel);
+    form.appendChild(posNew);
+    form.appendChild(actions);
     form.appendChild(hint);
+    form.appendChild(bar);
     form.appendChild(msg);
-    form.appendChild(cancel);
     panel.appendChild(form);
 
     function refreshBar() {
@@ -365,17 +404,105 @@ import JC from 'customize.api';
       });
     });
 
+    JC.callAction('position', 'positions', {}).then(function (res) {
+      (res && res.positions || []).forEach(function (p) {
+        var o = doc.createElement('option');
+        o.value = p;
+        o.textContent = p;
+        posSel.appendChild(o);
+      });
+
+      // A final "+ New position" choice that reveals the name field.
+      var newOpt = doc.createElement('option');
+      newOpt.value = '__new__';
+      newOpt.textContent = t('PLG_CUSTOMIZE_POSITION_NEW_OPTION', '+ New position');
+      posSel.appendChild(newOpt);
+    });
+
+    posSel.addEventListener('change', function () {
+      var isNew = posSel.value === '__new__';
+      posNew.classList.toggle('customize-hidden', !isNew);
+
+      if (isNew) {
+        posNew.focus();
+      }
+    });
+
     function close() {
       form.remove();
       btn.classList.remove('customize-hidden');
     }
 
-    function fail() {
-      msg.textContent = t('PLG_CUSTOMIZE_POSITION_ADD_FAILED', 'Could not add the module.');
+    function fail(message) {
+      msg.textContent = message || t('PLG_CUSTOMIZE_POSITION_ADD_FAILED', 'Could not add the module.');
       msg.classList.remove('customize-hidden');
     }
 
     cancel.addEventListener('click', close);
+
+    // Create the module in the chosen position (no dragging needed). The module create itself.
+    function createModule(position) {
+      return JC.callAction('position', 'add', { title: titleInput.value.trim(), module: typeSel.value, position: position }).then(function (res) {
+        if (res && res.success) {
+          newModuleId = res.id;
+          close();
+          reloadFrame();
+        } else {
+          addBtn.disabled = false;
+          fail();
+        }
+      }).catch(function () {
+        addBtn.disabled = false;
+        fail();
+      });
+    }
+
+    addBtn.addEventListener('click', function () {
+      var title = titleInput.value.trim();
+
+      if (!title || !typeSel.value) {
+        fail(t('PLG_CUSTOMIZE_POSITION_ADD_NEEDINFO', 'Choose a type and enter a title first.'));
+        return;
+      }
+
+      if (!posSel.value) {
+        fail(t('PLG_CUSTOMIZE_POSITION_ADD_NEEDPOS', 'Choose a position.'));
+        return;
+      }
+
+      msg.classList.add('customize-hidden');
+      addBtn.disabled = true;
+
+      // "+ New position": create the position first (it declares it on the child template and renders
+      // it), then place the module in it, so the new position is created with a module and is visible.
+      if (posSel.value === '__new__') {
+        var newName = posNew.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+
+        if (!newName) {
+          addBtn.disabled = false;
+          fail(t('PLG_CUSTOMIZE_POSITION_ADD_NEEDPOS', 'Choose a position.'));
+          posNew.focus();
+          return;
+        }
+
+        JC.templateAction('addPosition', { name: newName, region: 'main' }).then(function (r) {
+          if (!r || !r.success) {
+            addBtn.disabled = false;
+            fail(r && r.message);
+            return;
+          }
+
+          return createModule(newName);
+        }).catch(function () {
+          addBtn.disabled = false;
+          fail();
+        });
+
+        return;
+      }
+
+      createModule(posSel.value);
+    });
 
     bar.addEventListener('dragstart', function (e) {
       var title = titleInput.value.trim();
@@ -425,8 +552,9 @@ import JC from 'customize.api';
     titleInput.focus();
   }
 
-  // After the iframe reloads, highlight the freshly created module and pop its toolbar so it can
-  // be grabbed and dragged into place.
+  // After the iframe reloads, briefly highlight the freshly created module and pop its toolbar so it
+  // can be found (and grabbed/dragged into place). The highlight is transient: it clears on a timer
+  // and on the next interaction, so it never lingers (a drag also clears it via drag-start).
   JC.on('customize:frame-ready', function (e) {
     var doc = e.detail && e.detail.doc;
 
@@ -442,6 +570,16 @@ import JC from 'customize.api';
     }
 
     m.classList.add('customize-new');
+
+    function clearNew() {
+      m.classList.remove('customize-new');
+      doc.removeEventListener('pointerdown', clearNew, true);
+      doc.removeEventListener('keydown', clearNew, true);
+    }
+
+    doc.defaultView.setTimeout(clearNew, 4000);
+    doc.addEventListener('pointerdown', clearNew, true);
+    doc.addEventListener('keydown', clearNew, true);
 
     try {
       m.scrollIntoView({ block: 'center' });
@@ -472,6 +610,113 @@ import JC from 'customize.api';
 
   buildAddModule();
 
+  // --- Show all / used positions ----------------------------------------------
+  // Toggle a flag on the preview URL; the core document counter then reports every position as
+  // non-empty (so the template renders all of them) and the renderer marks the empty ones, revealing
+  // the full position map without the template having to change.
+  function buildShowPositions() {
+    var panel = JC.panel && JC.panel();
+
+    if (!panel) {
+      return;
+    }
+
+    var doc = window.document;
+    // Remember the editor's choice for this browser-tab session, so a full admin reload (which brings
+    // the iframe back on its plain server src, without the flag) re-applies it instead of dropping it.
+    var STORE = 'customizeShowPositions';
+    var btn = doc.createElement('button');
+    btn.type = 'button';
+    btn.className = 'customize-show-positions btn btn-outline-secondary btn-sm';
+    panel.appendChild(btn);
+
+    function frameUrl() {
+      var f = doc.getElementById('customize-frame');
+
+      try {
+        return f ? new URL(f.contentWindow.location.href) : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function isOn() {
+      var u = frameUrl();
+      return !!(u && u.searchParams.get('customizepositions') === '1');
+    }
+
+    function persisted() {
+      try {
+        return window.sessionStorage.getItem(STORE) === '1';
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function reloadWith(on) {
+      var f = doc.getElementById('customize-frame');
+      var u = frameUrl();
+
+      // Never act on a frame that has not loaded its page yet (about:blank): navigating it with the
+      // flag would blank the preview, and the blank page carries no customize marker to recover from.
+      if (!f || !u || (u.protocol !== 'http:' && u.protocol !== 'https:')) {
+        return;
+      }
+
+      if (on) {
+        u.searchParams.set('customizepositions', '1');
+      } else {
+        u.searchParams.delete('customizepositions');
+      }
+
+      try {
+        f.contentWindow.location.replace(u.toString());
+      } catch (e) {
+        f.src = u.toString();
+      }
+    }
+
+    function label() {
+      btn.textContent = isOn()
+        ? t('PLG_CUSTOMIZE_POSITION_SHOW_USED', 'Show used positions')
+        : t('PLG_CUSTOMIZE_POSITION_SHOW_ALL', 'Show all positions');
+    }
+
+    btn.addEventListener('click', function () {
+      var on = !isOn();
+
+      try {
+        if (on) {
+          window.sessionStorage.setItem(STORE, '1');
+        } else {
+          window.sessionStorage.removeItem(STORE);
+        }
+      } catch (e) {
+        // sessionStorage may be unavailable; the URL flag still works for this session.
+      }
+
+      reloadWith(on);
+    });
+
+    JC.on('customize:frame-ready', function () {
+      // The frame has really loaded now, so restoring the remembered choice is safe: reload it with the
+      // flag (this re-fires with the flag present, settling after one extra load), else sync the label.
+      if (persisted() && !isOn()) {
+        reloadWith(true);
+
+        return;
+      }
+
+      label();
+    });
+
+    // Initial label only. Do NOT reload here: the iframe may not have navigated to its page yet (its
+    // location can still be about:blank), and reloading that would blank the preview.
+    label();
+  }
+
+  buildShowPositions();
+
   // Open the "move to position" picker for a module. Shared by the keyboard Ctrl+arrows, the drag
   // move-bar, and the toolbar Move button. dir optionally pre-steps the position selection.
   function startMove(el, doc, dir) {
@@ -497,8 +742,11 @@ import JC from 'customize.api';
         return;
       }
 
+      // A move to a different position changes which positions are empty, so the markers must be
+      // re-rendered (reload); a reorder within the same position is already correct in the DOM.
+      var crossed = info.dragged.getAttribute('data-customize-position') !== position;
       info.dragged.setAttribute('data-customize-position', position);
-      saveOrder(info.doc, position);
+      saveOrder(info.doc, position, crossed);
     },
     // Keyboard "send to position" (Ctrl+Left/Right) opens the same picker as the Move toolbar button.
     onMove: function (info) {

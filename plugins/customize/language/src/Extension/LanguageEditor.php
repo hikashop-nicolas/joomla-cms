@@ -30,7 +30,7 @@ use Joomla\Event\SubscriberInterface;
  * those into editable areas, and the save writes a standard language override that Joomla applies
  * natively for everyone.
  *
- * @since  1.0.0
+ * @since  __DEPLOY_VERSION__
  */
 final class LanguageEditor extends CMSPlugin implements SubscriberInterface
 {
@@ -38,7 +38,7 @@ final class LanguageEditor extends CMSPlugin implements SubscriberInterface
      * Load the plugin language file on instantiation.
      *
      * @var    boolean
-     * @since  1.0.0
+     * @since  __DEPLOY_VERSION__
      */
     protected $autoloadLanguage = true;
 
@@ -47,7 +47,7 @@ final class LanguageEditor extends CMSPlugin implements SubscriberInterface
      *
      * @return  array
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     public static function getSubscribedEvents(): array
     {
@@ -64,7 +64,7 @@ final class LanguageEditor extends CMSPlugin implements SubscriberInterface
      *
      * @return  void
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     public function onAfterRender(): void
     {
@@ -106,7 +106,7 @@ final class LanguageEditor extends CMSPlugin implements SubscriberInterface
      *
      * @return  void
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     public function onAjaxLanguage(AjaxEvent $event): void
     {
@@ -164,7 +164,7 @@ final class LanguageEditor extends CMSPlugin implements SubscriberInterface
      *
      * @return  string|null  The normalised key, or null when it is not a valid identifier.
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private static function sanitizeKey(string $raw): ?string
     {
@@ -181,7 +181,7 @@ final class LanguageEditor extends CMSPlugin implements SubscriberInterface
      *
      * @return  string  A safe language tag.
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private static function safeLanguageTag(string $tag): string
     {
@@ -193,7 +193,7 @@ final class LanguageEditor extends CMSPlugin implements SubscriberInterface
      *
      * @return  void
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     public function onCustomizeAdminInit(): void
     {
@@ -234,7 +234,7 @@ final class LanguageEditor extends CMSPlugin implements SubscriberInterface
      *
      * @return  string
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private function fail(string $message): string
     {

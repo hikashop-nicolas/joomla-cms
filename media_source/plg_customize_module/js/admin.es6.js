@@ -97,9 +97,11 @@ import JC from 'customize.api';
     });
   }
 
-  // Edit a custom (mod_custom) module's HTML body in place with a WYSIWYG editor.
+  // Edit a custom (mod_custom) module's HTML body in place with a WYSIWYG editor. The editable body
+  // carries the "mod-custom" class, which depending on the module chrome is either a child of the area
+  // element or the area element itself (e.g. an empty module with "none" chrome), so handle both.
   function editContent(ctx) {
-    var contentEl = ctx.el.querySelector('.mod-custom');
+    var contentEl = ctx.el.classList.contains('mod-custom') ? ctx.el : ctx.el.querySelector('.mod-custom');
 
     if (!contentEl) {
       JC.ui.toast(ctx.doc, t('PLG_CUSTOMIZE_MODULE_NO_CONTENT', 'No editable content here.'));
@@ -164,8 +166,9 @@ import JC from 'customize.api';
   if (perms.modules) {
     JC.registerAreaType('module', { label: t('PLG_CUSTOMIZE_MODULE_AREA', 'Module') });
     JC.registerButton('module', { id: 'edit', label: t('PLG_CUSTOMIZE_MODULE_BTN_EDIT', 'Edit'), order: 10, onClick: editModule });
-    // Only shown on custom modules (data-customize-custom emitted by the renderer).
-    JC.registerButton('module', { id: 'content', label: t('PLG_CUSTOMIZE_MODULE_BTN_CONTENT', 'Edit content'), order: 20, requires: 'custom', onClick: editContent });
+    // Only shown on custom modules (data-customize-custom emitted by the renderer). primary: a
+    // double-click on a custom module edits its content (rather than opening the settings popover).
+    JC.registerButton('module', { id: 'content', label: t('PLG_CUSTOMIZE_MODULE_BTN_CONTENT', 'Edit content'), order: 20, requires: 'custom', primary: true, onClick: editContent });
 
     // Layout override needs core.admin, and only shows when the module's layout file was resolved.
     if (perms.overrides) {

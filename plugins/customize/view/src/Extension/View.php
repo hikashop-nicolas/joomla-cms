@@ -29,7 +29,7 @@ use Joomla\Event\SubscriberInterface;
  * hook) so the editor can target it, opens the native Joomla template editor on a created override
  * ("Edit layout"), and reorders reliably-mappable blocks via a template override.
  *
- * @since  1.0.0
+ * @since  __DEPLOY_VERSION__
  */
 final class View extends CMSPlugin implements SubscriberInterface
 {
@@ -37,7 +37,7 @@ final class View extends CMSPlugin implements SubscriberInterface
      * Load the plugin language file on instantiation.
      *
      * @var    boolean
-     * @since  1.0.0
+     * @since  __DEPLOY_VERSION__
      */
     protected $autoloadLanguage = true;
 
@@ -45,7 +45,7 @@ final class View extends CMSPlugin implements SubscriberInterface
      * Per-request occurrence counter, keyed by component|view|layout|block.
      *
      * @var    array<string, int>
-     * @since  1.0.0
+     * @since  __DEPLOY_VERSION__
      */
     private $occurrences = [];
 
@@ -54,7 +54,7 @@ final class View extends CMSPlugin implements SubscriberInterface
      *
      * @return  array
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     public static function getSubscribedEvents(): array
     {
@@ -73,7 +73,7 @@ final class View extends CMSPlugin implements SubscriberInterface
      *
      * @return  void
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     public function onCustomizeRenderView(GenericEvent $event): void
     {
@@ -137,7 +137,7 @@ final class View extends CMSPlugin implements SubscriberInterface
      *
      * @return  void
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     public function onAjaxView(AjaxEvent $event): void
     {
@@ -174,7 +174,7 @@ final class View extends CMSPlugin implements SubscriberInterface
      *
      * @return  string  JSON result.
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private function doOverride(array $payload): string
     {
@@ -218,7 +218,7 @@ final class View extends CMSPlugin implements SubscriberInterface
      * @return  array|null  Keys component, view, template, fileName, source, relPath, type; or null
      *                      when the request is not a valid view/module override target.
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private static function sanitizeOverrideRequest(array $payload): ?array
     {
@@ -270,7 +270,7 @@ final class View extends CMSPlugin implements SubscriberInterface
      *
      * @return  integer
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private function templateExtensionId(string $template): int
     {
@@ -296,7 +296,7 @@ final class View extends CMSPlugin implements SubscriberInterface
      *
      * @return  void
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     public function onCustomizeAdminInit(): void
     {
@@ -338,7 +338,7 @@ final class View extends CMSPlugin implements SubscriberInterface
      *
      * @return  string
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private function fail(string $message): string
     {

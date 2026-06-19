@@ -32,7 +32,7 @@ use Joomla\Registry\Registry;
  * Modules are marked with data-customize-* by the core ModulesRenderer when customize mode is
  * active; this plugin handles the load/save AJAX through com_ajax (group=customize).
  *
- * @since  1.0.0
+ * @since  __DEPLOY_VERSION__
  */
 final class Module extends CMSPlugin implements SubscriberInterface
 {
@@ -40,7 +40,7 @@ final class Module extends CMSPlugin implements SubscriberInterface
      * Load the plugin language file on instantiation.
      *
      * @var    boolean
-     * @since  1.0.0
+     * @since  __DEPLOY_VERSION__
      */
     protected $autoloadLanguage = true;
 
@@ -49,7 +49,7 @@ final class Module extends CMSPlugin implements SubscriberInterface
      *
      * @return  array
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     public static function getSubscribedEvents(): array
     {
@@ -67,7 +67,7 @@ final class Module extends CMSPlugin implements SubscriberInterface
      *
      * @return  string  JSON result.
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private function doMoveMenuItem(array $payload): string
     {
@@ -99,7 +99,7 @@ final class Module extends CMSPlugin implements SubscriberInterface
      *
      * @return  string  JSON result.
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private function doSaveMenuItem(array $payload): string
     {
@@ -129,7 +129,7 @@ final class Module extends CMSPlugin implements SubscriberInterface
      *
      * @return  string  JSON result.
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private function doDeleteMenuItem(array $payload): string
     {
@@ -158,7 +158,7 @@ final class Module extends CMSPlugin implements SubscriberInterface
      *
      * @return  void
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     public function onCustomizeModule(GenericEvent $event): void
     {
@@ -196,7 +196,7 @@ final class Module extends CMSPlugin implements SubscriberInterface
      *
      * @return  string
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private function layoutAttributes($module): string
     {
@@ -235,7 +235,7 @@ final class Module extends CMSPlugin implements SubscriberInterface
      *
      * @return  void
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     public function onAjaxModule(AjaxEvent $event): void
     {
@@ -337,7 +337,7 @@ final class Module extends CMSPlugin implements SubscriberInterface
      *
      * @return  void
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     public function onCustomizeAdminInit(): void
     {
@@ -398,7 +398,7 @@ final class Module extends CMSPlugin implements SubscriberInterface
      *
      * @return  string
      *
-     * @since   1.0.0
+     * @since   __DEPLOY_VERSION__
      */
     private function fail(string $message): string
     {
