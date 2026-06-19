@@ -139,6 +139,14 @@ class HtmlView extends BaseHtmlView
             }
         );
 
+        // Open the visual Customize view for a saved site style (the frontend renders with that style).
+        if (!$isNew && (int) $this->item->client_id === 0 && $canDo->get('core.edit')) {
+            $toolbar->linkButton('customize', 'COM_TEMPLATES_CUSTOMIZE_TOOLBAR')
+                ->url('index.php?option=com_templates&view=customize&id=' . (int) $this->item->id)
+                ->buttonClass('btn btn-info')
+                ->icon('icon-paint-brush');
+        }
+
         if (empty($this->item->id)) {
             $toolbar->cancel('style.cancel', 'JTOOLBAR_CANCEL');
         } else {
