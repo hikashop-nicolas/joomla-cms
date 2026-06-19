@@ -10,6 +10,8 @@
 
 defined('_JEXEC') or die;
 
+use Joomla\CMS\Customize\CustomizeMode;
+use Joomla\CMS\Customize\LayoutHelper;
 use Joomla\CMS\Factory;
 use Joomla\CMS\HTML\HTMLHelper;
 use Joomla\CMS\Language\Text;
@@ -20,6 +22,10 @@ use Joomla\CMS\Uri\Uri;
 $app   = Factory::getApplication();
 $input = $app->getInput();
 $wa    = $this->getWebAssetManager();
+
+// Customize mode: emit a few hooks (sidebar resize handles, position drop targets) only when the
+// request carries a valid customize token, so normal visitors get untouched markup.
+$customizeActive = CustomizeMode::isActive();
 
 // Browsers support SVG favicons
 $this->addHeadLink(HTMLHelper::_('image', 'joomla-favicon.svg', '', [], true, 1), 'icon', 'rel', ['type' => 'image/svg+xml']);
@@ -82,6 +88,7 @@ $wa->usePreset('template.cassiopeia.' . ($this->direction === 'rtl' ? 'rtl' : 'l
     ->useStyle('template.user')
     ->useScript('template.user')
     ->addInlineStyle(":root {
+
 		--hue: 214;
 		--template-bg-light: #f0f4fb;
 		--template-text-dark: #495057;
@@ -93,6 +100,19 @@ $wa->usePreset('template.cassiopeia.' . ($this->direction === 'rtl' ? 'rtl' : 'l
 
 // Override 'template.active' asset to set correct ltr/rtl dependency
 $wa->registerStyle('template.active', '', [], [], ['template.cassiopeia.' . ($this->direction === 'rtl' ? 'rtl' : 'ltr')]);
+
+// Customize-mode layout overrides (main/sidebar ratio), written by the Customize host into this
+// template's media dir. Injected inline after the template CSS whenever present, so the choices apply
+// on the live site too. A child template has no media of its own, so fall back to the parent's file.
+$czCssPath = JPATH_ROOT . '/media/templates/site/' . $app->getTemplate() . '/css/customize.css';
+
+if (!is_file($czCssPath) && ($czParent = $app->getTemplate(true)->parent ?? '')) {
+    $czCssPath = JPATH_ROOT . '/media/templates/site/' . $czParent . '/css/customize.css';
+}
+
+if (is_file($czCssPath)) {
+    $wa->addInlineStyle(file_get_contents($czCssPath));
+}
 
 // Logo file or site title param
 if ($this->params->get('logoFile')) {
@@ -184,63 +204,68 @@ $wa->getAsset('style', 'fontawesome')->setAttribute('rel', 'lazy-stylesheet');
     </header>
 
     <div class="site-grid">
-        <?php if ($this->countModules('banner', true)) : ?>
-            <div class="container-banner full-width">
-                <jdoc:include type="modules" name="banner" style="none" />
+        <?php if ($this->countModules('banner', true) || LayoutHelper::isSplit('banner')) : ?>
+            <div class="container-banner full-width"<?php echo LayoutHelper::positionAttrs('banner'); ?>>
+                <?php echo LayoutHelper::position('banner', '<jdoc:include type="modules" name="banner" style="none" />', ['addedStyle' => 'none']); ?>
             </div>
         <?php endif; ?>
 
-        <?php if ($this->countModules('top-a', true)) : ?>
-            <div class="grid-child container-top-a">
-                <jdoc:include type="modules" name="top-a" style="card" />
+        <?php if ($this->countModules('top-a', true) || LayoutHelper::isSplit('top-a')) : ?>
+            <div class="grid-child container-top-a"<?php echo LayoutHelper::positionAttrs('top-a'); ?>>
+                <?php echo LayoutHelper::position('top-a', '<jdoc:include type="modules" name="top-a" style="card" />'); ?>
             </div>
         <?php endif; ?>
 
-        <?php if ($this->countModules('top-b', true)) : ?>
-            <div class="grid-child container-top-b">
-                <jdoc:include type="modules" name="top-b" style="card" />
+        <?php if ($this->countModules('top-b', true) || LayoutHelper::isSplit('top-b')) : ?>
+            <div class="grid-child container-top-b"<?php echo LayoutHelper::positionAttrs('top-b'); ?>>
+                <?php echo LayoutHelper::position('top-b', '<jdoc:include type="modules" name="top-b" style="card" />'); ?>
             </div>
         <?php endif; ?>
 
-        <?php if ($this->countModules('sidebar-left', true)) : ?>
-            <div class="grid-child container-sidebar-left">
-                <jdoc:include type="modules" name="sidebar-left" style="card" />
+        <?php if ($this->countModules('sidebar-left', true) || LayoutHelper::isSplit('sidebar-left')) : ?>
+            <div class="grid-child container-sidebar-left"<?php echo LayoutHelper::positionAttrs('sidebar-left'); ?>>
+                <?php if ($customizeActive) : ?>
+                    <span class="customize-region-boundary" data-customize-edge="left" title="<?php echo htmlspecialchars(Text::_('TPL_CASSIOPEIA_CUSTOMIZE_RATIO_HINT'), ENT_QUOTES, 'UTF-8'); ?>"></span>
+                <?php endif; ?>
+                <?php echo LayoutHelper::position('sidebar-left', '<jdoc:include type="modules" name="sidebar-left" style="card" />'); ?>
             </div>
         <?php endif; ?>
 
-        <div class="grid-child container-component">
-            <jdoc:include type="modules" name="breadcrumbs" style="none" />
-            <jdoc:include type="modules" name="main-top" style="card" />
-            <jdoc:include type="message" />
-            <main>
-                <jdoc:include type="component" />
-            </main>
-            <jdoc:include type="modules" name="main-bottom" style="card" />
+        <div class="grid-child container-component"<?php echo $customizeActive ? ' data-customize-grid="main"' : ''; ?>>
+            <?php echo LayoutHelper::grid('main', [
+                ['id' => 'breadcrumbs', 'position' => 'breadcrumbs', 'html' => '<jdoc:include type="modules" name="breadcrumbs" style="none" />'],
+                ['id' => 'main-top', 'position' => 'main-top', 'html' => '<jdoc:include type="modules" name="main-top" style="card" />'],
+                ['id' => 'component', 'html' => '<jdoc:include type="message" /><main><jdoc:include type="component" /></main>', 'removable' => false],
+                ['id' => 'main-bottom', 'position' => 'main-bottom', 'html' => '<jdoc:include type="modules" name="main-bottom" style="card" />'],
+            ]); ?>
         </div>
 
-        <?php if ($this->countModules('sidebar-right', true)) : ?>
-            <div class="grid-child container-sidebar-right">
-                <jdoc:include type="modules" name="sidebar-right" style="card" />
+        <?php if ($this->countModules('sidebar-right', true) || LayoutHelper::isSplit('sidebar-right')) : ?>
+            <div class="grid-child container-sidebar-right"<?php echo LayoutHelper::positionAttrs('sidebar-right'); ?>>
+                <?php if ($customizeActive) : ?>
+                    <span class="customize-region-boundary" data-customize-edge="right" title="<?php echo htmlspecialchars(Text::_('TPL_CASSIOPEIA_CUSTOMIZE_RATIO_HINT'), ENT_QUOTES, 'UTF-8'); ?>"></span>
+                <?php endif; ?>
+                <?php echo LayoutHelper::position('sidebar-right', '<jdoc:include type="modules" name="sidebar-right" style="card" />'); ?>
             </div>
         <?php endif; ?>
 
-        <?php if ($this->countModules('bottom-a', true)) : ?>
-            <div class="grid-child container-bottom-a">
-                <jdoc:include type="modules" name="bottom-a" style="card" />
+        <?php if ($this->countModules('bottom-a', true) || LayoutHelper::isSplit('bottom-a')) : ?>
+            <div class="grid-child container-bottom-a"<?php echo LayoutHelper::positionAttrs('bottom-a'); ?>>
+                <?php echo LayoutHelper::position('bottom-a', '<jdoc:include type="modules" name="bottom-a" style="card" />'); ?>
             </div>
         <?php endif; ?>
 
-        <?php if ($this->countModules('bottom-b', true)) : ?>
-            <div class="grid-child container-bottom-b">
-                <jdoc:include type="modules" name="bottom-b" style="card" />
+        <?php if ($this->countModules('bottom-b', true) || LayoutHelper::isSplit('bottom-b')) : ?>
+            <div class="grid-child container-bottom-b"<?php echo LayoutHelper::positionAttrs('bottom-b'); ?>>
+                <?php echo LayoutHelper::position('bottom-b', '<jdoc:include type="modules" name="bottom-b" style="card" />'); ?>
             </div>
         <?php endif; ?>
     </div>
 
-    <?php if ($this->countModules('footer', true)) : ?>
+    <?php if ($this->countModules('footer', true) || LayoutHelper::isSplit('footer')) : ?>
         <footer class="container-footer footer full-width">
-            <div class="grid-child">
-                <jdoc:include type="modules" name="footer" style="none" />
+            <div class="grid-child"<?php echo LayoutHelper::positionAttrs('footer'); ?>>
+                <?php echo LayoutHelper::position('footer', '<jdoc:include type="modules" name="footer" style="none" />', ['addedStyle' => 'none']); ?>
             </div>
         </footer>
     <?php endif; ?>
