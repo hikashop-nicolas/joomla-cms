@@ -1,0 +1,21 @@
+{
+  "$schema": "https://developer.joomla.org/schemas/json-schema/web_assets.json",
+  "name": "plg_customize_layout",
+  "version": "1.0.0",
+  "description": "Joomla CMS - Customize layout plugin",
+  "license": "GPL-2.0-or-later",
+  "assets": [
+    {
+      "name": "plg_customize_layout.admin",
+      "type": "script",
+      "uri": "plg_customize_layout/admin.min.js",
+      "dependencies": [
+        "core",
+        "customize.api"
+      ],
+      "attributes": {
+        "type": "module"
+      }
+    }
+  ]
+}

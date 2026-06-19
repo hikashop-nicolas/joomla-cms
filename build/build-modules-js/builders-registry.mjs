@@ -63,6 +63,7 @@ export const builders = [
   'plg_content_vote',
   'plg_customize_content',
   'plg_customize_language',
+  'plg_customize_layout',
   'plg_customize_module',
   'plg_customize_position',
   'plg_customize_view',
