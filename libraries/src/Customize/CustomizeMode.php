@@ -44,6 +44,15 @@ final class CustomizeMode
     private static $active = false;
 
     /**
+     * Whether to surface every template position (even empty ones) for this request. Requested by the
+     * editor via the "customizepositions" flag, and only honoured while customize mode is active.
+     *
+     * @var    boolean
+     * @since  __DEPLOY_VERSION__
+     */
+    private static $showAllPositions = false;
+
+    /**
      * Map of language key => translated string used during this request (customize mode only).
      *
      * @var    array<string, string>
@@ -79,7 +88,22 @@ final class CustomizeMode
      */
     public static function detect(CMSApplicationInterface $app): void
     {
-        self::$active = self::validateToken((string) $app->getInput()->getCmd('customize', ''), $app);
+        self::$active           = self::validateToken((string) $app->getInput()->getCmd('customize', ''), $app);
+        self::$showAllPositions = self::$active && (bool) $app->getInput()->getInt('customizepositions', 0);
+    }
+
+    /**
+     * Whether to surface every template position (even empty ones) for this request. Used by the
+     * document's module counter and the modules renderer to reveal the full position map on demand,
+     * without the template needing to change.
+     *
+     * @return  boolean
+     *
+     * @since   __DEPLOY_VERSION__
+     */
+    public static function showAllPositions(): bool
+    {
+        return self::$showAllPositions;
     }
 
     /**

@@ -12,6 +12,7 @@ namespace Joomla\CMS\Document;
 use Joomla\CMS\Cache\Cache;
 use Joomla\CMS\Cache\CacheControllerFactoryAwareInterface;
 use Joomla\CMS\Cache\CacheControllerFactoryAwareTrait;
+use Joomla\CMS\Customize\CustomizeMode;
 use Joomla\CMS\Factory as CmsFactory;
 use Joomla\CMS\Filter\InputFilter;
 use Joomla\CMS\Helper\ModuleHelper;
@@ -665,28 +666,34 @@ class HtmlDocument extends Document implements CacheControllerFactoryAwareInterf
      */
     public function countModules(string $positionName, bool $withContentOnly = false)
     {
-        if ((isset(parent::$_buffer['modules'][$positionName])) && (parent::$_buffer['modules'][$positionName] === false)) {
-            return 0;
+        $result = 0;
+
+        if (!((isset(parent::$_buffer['modules'][$positionName])) && (parent::$_buffer['modules'][$positionName] === false))) {
+            $modules = ModuleHelper::getModules($positionName);
+
+            if (!$withContentOnly) {
+                $result = \count($modules);
+            } else {
+                // Now we need to count only modules which actually have a content
+                $renderer = $this->loadRenderer('module');
+
+                foreach ($modules as $module) {
+                    if (empty($module->contentRendered)) {
+                        $renderer->render($module, ['contentOnly' => true]);
+                    }
+
+                    if (trim($module->content) !== '') {
+                        $result++;
+                    }
+                }
+            }
         }
 
-        $modules = ModuleHelper::getModules($positionName);
-
-        if (!$withContentOnly) {
-            return \count($modules);
-        }
-
-        // Now we need to count only modules which actually have a content
-        $result   = 0;
-        $renderer = $this->loadRenderer('module');
-
-        foreach ($modules as $module) {
-            if (empty($module->contentRendered)) {
-                $renderer->render($module, ['contentOnly' => true]);
-            }
-
-            if (trim($module->content) !== '') {
-                $result++;
-            }
+        // In customize "show all positions" mode, report every position as non-empty so the template
+        // renders all its position containers (and sets layout classes like has-sidebar-*); the modules
+        // renderer then surfaces an empty-position marker for the ones with no real content.
+        if ($result === 0 && CustomizeMode::showAllPositions()) {
+            return 1;
         }
 
         return $result;
