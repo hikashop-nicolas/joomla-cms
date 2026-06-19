@@ -518,7 +518,7 @@ final class LayoutHelper
                 continue;
             }
 
-            $region = (string) ($p['region'] ?? 'main');
+            $region                    = (string) ($p['region'] ?? 'main');
             $grids[$region]['added'][] = (string) $p['name'];
         }
 
@@ -585,6 +585,6 @@ final class LayoutHelper
      */
     private static function num(float $n): string
     {
-        return rtrim(rtrim(sprintf('%.3f', $n), '0'), '.');
+        return rtrim(rtrim(\sprintf('%.3f', $n), '0'), '.');
     }
 }
